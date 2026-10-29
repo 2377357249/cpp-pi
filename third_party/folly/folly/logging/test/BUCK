@@ -1,0 +1,383 @@
+load("@fbcode_macros//build_defs:python_unittest.bzl", "python_unittest")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rule.bzl", "fb_dirsync_rule")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "async_file_writer_test",
+    srcs = ["AsyncFileWriterTest.cpp"],
+    deps = [
+        "//folly:conv",
+        "//folly:exception",
+        "//folly:file",
+        "//folly:file_util",
+        "//folly:string",
+        "//folly:synchronized",
+        "//folly/futures:core",
+        "//folly/lang:safe_assert",
+        "//folly/logging:logging",
+        "//folly/portability:config",
+        "//folly/portability:gflags",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/portability:unistd",
+        "//folly/system:thread_id",
+        "//folly/system:thread_name",
+        "//folly/testing:test_util",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_log_writer_test",
+    srcs = ["AsyncLogWriterTest.cpp"],
+    deps = [
+        "//folly/logging:logging",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "config_parser_test",
+    srcs = ["ConfigParserTest.cpp"],
+    deps = [
+        ":config_helpers",
+        "//folly:string",
+        "//folly/json:dynamic",
+        "//folly/logging:init",
+        "//folly/logging:logging",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "config_update_test",
+    srcs = ["ConfigUpdateTest.cpp"],
+    deps = [
+        ":config_helpers",
+        ":test_handler",
+        "//folly/json:dynamic",
+        "//folly/logging:init",
+        "//folly/logging:log_handler",
+        "//folly/logging:logging",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_rule(
+    name = "fatal_test",
+    srcs = ["fatal_test.py"],
+    env = {
+        "FOLLY_FATAL_HELPER": "$(location fbcode//folly/logging/test/helpers:fatal_helper)",
+    },
+    fbcode_rule = python_unittest,
+)
+
+fb_dirsync_rule(
+    name = "log_after_main",
+    srcs = ["log_after_main.py"],
+    env = {
+        "FOLLY_LOG_AFTER_MAIN_HELPER": "$(location fbcode//folly/logging/test/helpers:log_after_main)",
+        "FOLLY_LOG_AFTER_MAIN_NO_INIT_HELPER": "$(location fbcode//folly/logging/test/helpers:log_after_main_no_init)",
+    },
+    fbcode_rule = python_unittest,
+)
+
+fb_dirsync_cpp_unittest(
+    name = "file_handler_factory_test",
+    srcs = ["FileHandlerFactoryTest.cpp"],
+    deps = [
+        "//folly:exception",
+        "//folly/logging:file_handler_factory",
+        "//folly/logging:logging",
+        "//folly/portability:gtest",
+        "//folly/test:test_utils",
+        "//folly/testing:test_util",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "custom_log_formatter_test",
+    srcs = ["CustomLogFormatterTest.cpp"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:format",
+        "//folly/init:init",
+        "//folly/logging:logging",
+        "//folly/portability:gtest",
+        "//folly/portability:stdlib",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "glog_formatter_test",
+    srcs = ["GlogFormatterTest.cpp"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:format",
+        "//folly/init:init",
+        "//folly/logging:logging",
+        "//folly/portability:gtest",
+        "//folly/portability:stdlib",
+        "//folly/system:thread_name",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "immediate_file_writer_test",
+    srcs = ["ImmediateFileWriterTest.cpp"],
+    deps = [
+        "//folly:conv",
+        "//folly:exception",
+        "//folly:file_util",
+        "//folly/logging:logging",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/portability:unistd",
+        "//folly/testing:test_util",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "init_test",
+    srcs = ["InitTest.cpp"],
+    deps = [
+        ":config_helpers",
+        "//folly/logging:init",
+        "//folly/logging:logging",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "log_category_test",
+    srcs = ["LogCategoryTest.cpp"],
+    deps = [
+        ":test_handler",
+        "//folly:conv",
+        "//folly/logging:logging",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "logger_db_test",
+    srcs = ["LoggerDBTest.cpp"],
+    deps = [
+        ":test_handler",
+        "//folly/logging:logging",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "logger_test",
+    srcs = ["LoggerTest.cpp"],
+    deps = [
+        ":test_handler",
+        "//folly/logging:log_handler",
+        "//folly/logging:logging",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "log_level_test",
+    srcs = ["LogLevelTest.cpp"],
+    deps = [
+        "//folly:conv",
+        "//folly:random",
+        "//folly/logging:log_level",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "log_message_test",
+    srcs = ["LogMessageTest.cpp"],
+    deps = [
+        "//folly:string",
+        "//folly/logging:logging",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "log_name_test",
+    srcs = ["LogNameTest.cpp"],
+    deps = [
+        "//folly/logging:log_name",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "log_stream_test",
+    srcs = ["LogStreamTest.cpp"],
+    deps = [
+        "//folly/logging:logging",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rate_limiter_test",
+    srcs = ["RateLimiterTest.cpp"],
+    deps = [
+        "//folly:conv",
+        "//folly/logging:rate_limiter",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "standard_log_handler_test",
+    srcs = ["StandardLogHandlerTest.cpp"],
+    deps = [
+        "//folly:conv",
+        "//folly/logging:log_handler",
+        "//folly/logging:log_level",
+        "//folly/logging:logging",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "config_helpers",
+    srcs = ["ConfigHelpers.cpp"],
+    headers = ["ConfigHelpers.h"],
+    deps = [
+        "//folly:string",
+        "//folly/logging:init",
+        "//folly/logging:log_handler",
+        "//folly/logging:logging",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "sync_level_test",
+    srcs = ["SyncLevelTest.cpp"],
+    deps = [
+        "//folly/logging:init",
+        "//folly/logging:log_handler",
+        "//folly/logging:logging",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "test_handler",
+    srcs = ["TestLogHandler.cpp"],
+    headers = ["TestLogHandler.h"],
+    deps = [
+        "//folly:map_util",
+    ],
+    exported_deps = [
+        "//folly/logging:log_handler",
+        "//folly/logging:logging",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "xlog_test_lib",
+    srcs = [
+        "XlogFile1.cpp",
+        "XlogFile2.cpp",
+    ],
+    headers = [
+        "XlogHeader1.h",
+        "XlogHeader2.h",
+    ],
+    # Override the fbcode default for source paths and mapped header paths.
+    compiler_flags = [
+        "-UFOLLY_XLOG_STRIP_PREFIXES",
+        '-DFOLLY_XLOG_STRIP_PREFIXES="fbcode:fbsource:xplat"',
+    ],
+    exported_deps = [
+        "//folly:range",
+        "//folly/logging:logging",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "xlog_bench",
+    srcs = ["XlogBench.cpp"],
+    deps = [
+        "fbsource//third-party/boost:boost_preprocessor",
+        "//folly:benchmark",
+        "//folly/init:init",
+        "//folly/logging:init",
+        "//folly/logging:log_handler",
+        "//folly/logging:logging",
+        "//folly/portability:gflags",
+        "//folly/synchronization/test:barrier",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "xlog_test",
+    srcs = ["XlogTest.cpp"],
+    # Inline logging in the helper headers needs the same prefixes as the library.
+    compiler_flags = [
+        "-UFOLLY_XLOG_STRIP_PREFIXES",
+        '-DFOLLY_XLOG_STRIP_PREFIXES="fbcode:fbsource:xplat"',
+    ],
+    deps = [
+        ":test_handler",
+        ":xlog_test_lib",
+        "//folly/logging:init",
+        "//folly/logging:log_handler",
+        "//folly/logging:logging",
+        "//folly/portability:constexpr",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "standard_log_handler_factory_test",
+    srcs = ["StandardLogHandlerFactoryTest.cpp"],
+    deps = [
+        "//folly/logging:init",
+        "//folly/logging:log_handler",
+        "//folly/logging:logging",
+        "//folly/portability:gmock",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "bridge_from_google_logging_test",
+    srcs = ["BridgeFromGoogleLoggingTest.cpp"],
+    deps = [
+        ":test_handler",
+        "//folly/logging:glog_bridge",
+        "//folly/logging:init",
+        "//folly/logging:log_handler",
+        "//folly/logging:logging",
+        "//folly/portability:gtest",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "auto_timer_test",
+    srcs = ["AutoTimerTest.cpp"],
+    deps = [
+        "//folly/logging:auto_timer",
+        "//folly/portability:gtest",
+    ],
+)

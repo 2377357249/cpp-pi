@@ -1,0 +1,180 @@
+load("@fbsource//tools/build_defs:testpilot_defs.bzl", "tpx_labels")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_benchmark.bzl", "fb_dirsync_cpp_benchmark")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_benchmark(
+    name = "base_benchmark",
+    srcs = ["BaseBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:benchmark",
+        "//folly/gen:base",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "base_test",
+    srcs = ["BaseTest.cpp"],
+    headers = [],
+    labels = [
+        tpx_labels.serialize_test_cases,
+    ],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:fbvector",
+        "//folly:map_util",
+        "//folly:memory",
+        "//folly:string",
+        "//folly/gen:base",
+        "//folly/json:dynamic",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+        "//folly/testing:test_util",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "combine_test",
+    srcs = ["CombineTest.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:fbvector",
+        "//folly/gen:base",
+        "//folly/gen:combine",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "file_benchmark",
+    srcs = ["FileBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:benchmark",
+        "//folly:file",
+        "//folly/gen:base",
+        "//folly/gen:file",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "file_test",
+    srcs = ["FileTest.cpp"],
+    headers = [],
+    supports_static_listing = False,
+    deps = [
+        "//folly:file",
+        "//folly:range",
+        "//folly/container:array",
+        "//folly/gen:base",
+        "//folly/gen:file",
+        "//folly/portability:gtest",
+        "//folly/testing:test_util",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "parallel_benchmark",
+    srcs = ["ParallelBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        ":util",
+        "//folly/gen:base",
+        "//folly/gen:parallel",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "parallel_test",
+    srcs = ["ParallelTest.cpp"],
+    headers = [],
+    labels = [
+        tpx_labels.serialize,
+    ],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly/gen:base",
+        "//folly/gen:parallel",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "parallel_map_benchmark",
+    srcs = ["ParallelMapBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly/gen:base",
+        "//folly/gen:parallel_map",
+        "//folly/portability:unistd",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "parallel_map_test",
+    srcs = ["ParallelMapTest.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:memory",
+        "//folly/gen:base",
+        "//folly/gen:parallel_map",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "string_benchmark",
+    srcs = ["StringBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:benchmark",
+        "//folly:string",
+        "//folly/container:irange",
+        "//folly/gen:base",
+        "//folly/gen:string",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "string_test",
+    srcs = ["StringTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/functional:apply_tuple",
+        "//folly/gen:string",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "istream_test",
+    srcs = ["IStreamTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/gen:base",
+        "//folly/gen:istream",
+        "//folly/gen:string",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "util",
+    headers = ["Bench.h"],
+    exported_deps = [
+        "//folly:benchmark",
+    ],
+)

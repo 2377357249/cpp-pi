@@ -1,0 +1,63 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rule.bzl", "fb_dirsync_rule")
+load("../../../../io/async/test/certs/defs.bzl", "alias_pem", "alias_pem_for_xplat")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "ssl_errors_test",
+    srcs = ["SSLErrorsTest.cpp"],
+    oncall = "secure_pipes",
+    deps = [
+        "//folly/io/async/ssl:ssl_errors",
+        "//folly/portability:gtest",
+        "//folly/portability:openssl",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "basic_transport_certificate_test",
+    srcs = select({
+        "DEFAULT": [],
+        "ovr_config//runtime:fbcode": ["BasicTransportCertificateTest.cpp"],
+    }),
+    oncall = "secure_pipes",
+    resources = [
+        ":tests-cert.pem",
+    ],
+    deps = [
+        "//folly:file_util",
+        "//folly/io/async/ssl:basic_transport_certificate",
+        "//folly/portability:gtest",
+        "//folly/ssl:openssl_cert_utils",
+        "//folly/testing:test_util",
+    ],
+)
+
+# !!!! fbcode/folly/io/async/ssl/test/TARGETS was merged into this file, see https://fburl.com/workplace/xl8l9yuo for more info !!!!
+
+fb_dirsync_rule(
+    name = "dummy_name",
+    fbcode_rule = alias_pem,
+    pems = [
+        "tests-cert.pem",
+    ],
+    # alias_pem ignores `name` and creates one alias per pem; there is no
+    # single "_dummy_name" target to redirect to.
+    redirect = False,
+    xplat_rule = alias_pem_for_xplat,
+)
+
+fb_dirsync_cpp_unittest(
+    name = "openssl_utils_test",
+    srcs = ["OpenSSLUtilsTest.cpp"],
+    headers = [],
+    oncall = "secure_pipes",
+    deps = [
+        "//folly:string",
+        "//folly/io/async/ssl:openssl_utils",
+        "//folly/portability:gtest",
+        "//folly/portability:openssl",
+        "//folly/ssl:openssl_ptr_types",
+    ],
+)

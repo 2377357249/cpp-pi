@@ -1,0 +1,369 @@
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+load("@fbcode_macros//build_defs:cython_library.bzl", "CYTHON_DEFAULT_APPLE_SDKS", "CYTHON_DEFAULT_PLATFORMS", "cython_library")
+load("@fbcode_macros//build_defs:python_unittest.bzl", "python_unittest")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rule.bzl", "fb_dirsync_rule")
+load("@fbsource//tools/target_determinator/macros:ci.bzl", "ci")
+load("@fbsource//tools/target_determinator/macros:fbcode_ci_helpers.bzl", "fbcode_ci")
+load("../../defs.bzl", "folly_xplat_cxx_library", "folly_xplat_cxx_test")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_rule(
+    # @autodeps-skip
+    name = "futures",
+    srcs = ["futures.py"],
+    fbcode_rule = python_unittest,
+    supports_static_listing = False,
+    deps = [
+        ":simple_bridge",
+    ],
+)
+
+fb_dirsync_rule(
+    # @autodeps-skip
+    name = "coro",
+    srcs = ["coro.py"],
+    fbcode_rule = python_unittest,
+    supports_static_listing = False,
+    deps = [
+        ":simple_bridge_coro",
+    ],
+)
+
+fb_dirsync_rule(
+    name = "iobuf",
+    srcs = [
+        "iobuf.py",
+    ],
+    fbcode_rule = python_unittest,
+    labels = ci.labels(fbcode_ci.use_opt_instead_of_dev()),
+    supports_static_listing = False,
+    typing = True,
+    deps = [
+        ":iobuf_helper",
+        "//folly/python:iobuf",
+    ],
+)
+
+fb_dirsync_rule(
+    name = "simple_bridge",
+    srcs = ["simplebridge.pyx"],
+    headers = ["simple.h"],
+    header_namespace = "folly/python/test",
+    cpp_deps = [
+        "//folly/futures:core",
+    ],
+    fbcode_rule = cython_library,
+    deps = [
+        "//folly/python:fibers",
+        "//folly/python:futures",
+    ],
+)
+
+fb_dirsync_rule(
+    name = "iobuf_helper",
+    srcs = [
+        "IOBufTestUtils.cpp",
+        "iobuf_helper.pyx",
+    ],
+    headers = [
+        "IOBufTestUtils.h",
+        "iobuf_helper.pxd",
+    ],
+    header_namespace = "folly/python/test",
+    cpp_deps = [
+        "//folly/executors:global_executor",
+        "//folly/python:iobuf_ext",
+    ],
+    fbcode_rule = cython_library,
+    # Pin the Python module namespace so the cython stub is published as
+    # `folly.python.test.iobuf_helper` in both cells. Without it the xplat
+    # cell derives the base module from its package path
+    # (`xplat.folly.python.test.iobuf_helper`), which breaks consumers that
+    # build against xplat folly. Mirrors `//folly/python:iobuf`.
+    package = "folly/python/test",
+    types = [
+        "iobuf_helper.pyi",
+    ],
+    visibility = ["PUBLIC"],
+    deps = [
+        "//folly/python:iobuf",
+    ],
+)
+
+fb_dirsync_rule(
+    name = "simple_bridge_coro",
+    srcs = ["simplebridgecoro.pyx"],
+    headers = ["simplecoro.h"],
+    header_namespace = "folly/python/test",
+    cpp_deps = [
+        "//folly/coro:baton",
+        "//folly/coro:task",
+        "//folly/futures:core",
+        "//folly/python:asyncio_executor",
+        "//folly/python:executor_lib",
+        "//folly:cancellation_token",
+    ],
+    fbcode_rule = cython_library,
+    package = "folly/python/test",
+    types = ["simplebridgecoro.pyi"],
+    deps = [
+        "//folly/python:coro",
+    ],
+)
+
+fb_dirsync_rule(
+    name = "simple_generator",
+    srcs = ["simplegenerator.pyx"],
+    headers = ["simplegenerator.h"],
+    header_namespace = "folly/python/test",
+    cpp_deps = [
+        "//folly/coro:async_generator",
+    ],
+    fbcode_rule = cython_library,
+    deps = [
+        "//folly/python:async_generator",
+        "//folly/python:executor",
+    ],
+)
+
+fb_dirsync_rule(
+    # @autodeps-skip
+    name = "generator",
+    srcs = ["generator.py"],
+    fbcode_rule = python_unittest,
+    supports_static_listing = False,
+    deps = [
+        ":simple_generator",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "AsyncGeneratorTest",
+    srcs = [
+        "AsyncGeneratorTest.cpp",
+    ],
+    supports_static_listing = False,
+    xplat_impl = folly_xplat_cxx_test,
+    deps = [
+        "//folly/coro:blocking_wait",
+        "//folly/coro:task",
+        "//folly/portability:gtest",
+        "//folly/python:async_generator_lib",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "ErrorTest",
+    srcs = [
+        "ErrorTest.cpp",
+    ],
+    supports_static_listing = False,
+    target_compatible_with = ["fbcode//opensource/macros:broken-in-oss"],
+    xplat_impl = folly_xplat_cxx_test,
+    deps = [
+        "fbsource//third-party/python:python",
+        "fbsource//third-party/python:python-for-embedding",  # @manual
+        "//folly:scope_guard",
+        "//folly/portability:gtest",
+        "//folly/python:error",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "IOBufExtTest",
+    srcs = [
+        "IOBufExtTest.cpp",
+    ],
+    supports_static_listing = False,
+    target_compatible_with = ["fbcode//opensource/macros:broken-in-oss"],
+    xplat_impl = folly_xplat_cxx_test,
+    deps = [
+        "fbsource//third-party/python:python",
+        "fbsource//third-party/python:python-for-embedding",  # @manual
+        "//folly/executors:manual_executor",
+        "//folly/portability:gtest",
+        "//folly/python:iobuf_ext",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "ImportCacheTest",
+    srcs = [
+        "ImportCacheTest.cpp",
+    ],
+    supports_static_listing = False,
+    target_compatible_with = ["fbcode//opensource/macros:broken-in-oss"],
+    xplat_impl = folly_xplat_cxx_test,
+    deps = [
+        "fbsource//third-party/python:python",
+        "fbsource//third-party/python:python-for-embedding",  # @manual
+        "//folly:scope_guard",
+        "//folly/portability:gtest",
+        "//folly/python:import",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "ImportCacheFreeThreadingTest",
+    srcs = [
+        "ImportCacheTest.cpp",
+    ],
+    supports_static_listing = False,
+    target_compatible_with = [
+        "fbcode//opensource/macros:broken-in-oss",
+    ],
+    versions = {
+        "python": "3.14.free-threading",
+    },
+    xplat_impl = folly_xplat_cxx_test,
+    deps = [
+        "fbsource//third-party/python:python",
+        "fbsource//third-party/python:python-for-embedding",  # @manual
+        "//folly:scope_guard",
+        "//folly/portability:gtest",
+        "//folly/python:import",
+    ],
+)
+
+fb_dirsync_rule(
+    # @autodeps-skip
+    name = "teardown",
+    srcs = ["teardown.py"],
+    fbcode_rule = python_unittest,
+    supports_static_listing = False,
+    deps = [
+        ":simple_bridge",
+        ":simple_bridge_coro",
+    ],
+)
+
+fb_dirsync_rule(
+    # @autodeps-skip
+    name = "test_iobuf_ext",
+    srcs = ["test_iobuf_ext.py"],
+    fbcode_rule = python_unittest,
+    supports_static_listing = False,
+    deps = [
+        "//folly/python:iobuf",
+    ],
+)
+
+fb_dirsync_rule(
+    # @autodeps-skip
+    name = "test_set_executor",
+    srcs = ["test_set_executor.py"],
+    fbcode_rule = python_unittest,
+    supports_static_listing = False,
+    deps = [
+        ":test_set_executor_cython",
+    ],
+)
+
+fb_dirsync_rule(
+    name = "test_set_executor_cython",
+    srcs = ["test_set_executor_cython.pyx"],
+    cpp_deps = [
+        ":test_set_executor_cpplib",
+    ],
+    fbcode_rule = cython_library,
+    deps = [
+        "//folly/python:executor",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "test_set_executor_cpplib",
+    headers = ["test_set_executor.h"],
+    apple_sdks = CYTHON_DEFAULT_APPLE_SDKS,
+    modular_headers = False,
+    platforms = CYTHON_DEFAULT_PLATFORMS,
+    use_raw_headers = True,
+    xplat_impl = folly_xplat_cxx_library,
+    exported_deps = [
+        "//folly/python:asyncio_executor",
+    ],
+)
+
+fb_dirsync_rule(
+    name = "request_context",
+    srcs = ["request_context.py"],
+    compatible_with = [
+        "ovr_config//os:linux",
+    ],
+    fbcode_rule = python_unittest,
+    deps = [
+        ":request_context_helper",
+        "//folly/python:request_context",
+    ],
+)
+
+fb_dirsync_rule(
+    name = "request_context_helper",
+    srcs = ["request_context_helper.pyx"],
+    cpp_deps = [
+        "//folly/io/async:request_context",
+    ],
+    fbcode_rule = cython_library,
+    package = "folly/python/test",
+    types = ["request_context_helper.pyi"],
+    deps = [
+        "//folly/python:request_context",
+    ],
+)
+
+fb_dirsync_rule(
+    # @autodeps-skip
+    name = "test_set_executor_3_14",
+    srcs = ["test_set_executor.py"],
+    fbcode_only = True,
+    fbcode_rule = python_unittest,
+    py_version = "3.14.free-threading",
+    deps = [
+        ":test_set_executor_cython",
+    ],
+)
+
+cpp_unittest(
+    name = "weak-test-linked",
+    srcs = [
+        "WeakTest.cpp",
+    ],
+    compatible_with = [
+        "ovr_config//os:linux",
+        "ovr_config//os:macos",
+        "ovr_config//os:windows",
+    ],
+    supports_static_listing = True,
+    versions = {
+        "python": "3.12",
+    },
+    deps = [
+        "fbcode//folly/python:weak",  # @manual
+        # Pull in libpython so we are linked against it
+        "fbsource//third-party/googletest:gtest",  # @manual
+        "fbsource//third-party/python:python-for-embedding",  # @manual
+    ],
+)
+
+cpp_unittest(
+    name = "weak-test",
+    srcs = [
+        "WeakTest.cpp",
+    ],
+    compatible_with = [
+        "ovr_config//os:linux",
+        "ovr_config//os:macos",
+        "ovr_config//os:windows",
+    ],
+    supports_static_listing = True,
+    versions = {
+        "python": "3.12",
+    },
+    deps = [
+        "fbcode//folly/python:weak",  # @manual
+        "fbsource//third-party/googletest:gtest",  # @manual
+    ],
+)

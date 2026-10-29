@@ -1,0 +1,68 @@
+load("@fbcode_macros//build_defs:export_files.bzl", "export_file")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rule.bzl", "fb_dirsync_rule")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_binary(
+    # @autodeps-skip
+    name = "folly-addr2line",
+    srcs = [
+        "Addr2Line.cpp",
+    ],
+    deps = [
+        "//folly:range",
+        "//folly/debugging/symbolizer:dwarf",
+        "//folly/debugging/symbolizer:elf",
+        "//folly/debugging/symbolizer:symbolized_frame",
+        "//folly/debugging/symbolizer:symbolizer",
+        "//folly/init:init",
+        "//folly/portability:gflags",
+    ],
+)
+
+fb_dirsync_rule(
+    name = "libFollySegFault.so.v",
+    src = "libFollySegFault.so.v",
+    fbcode_rule = export_file,
+)
+
+# Build a standlone DSO for use w/ `LD_PRELOAD`.
+fb_dirsync_cpp_binary(
+    name = "libFollySegFault.so",
+    srcs = [
+        "LibSegFault.cpp",
+    ],
+    compiler_flags = [
+        # Allow using the elvis operator.
+        "-Wno-gnu-conditional-omitted-operand",
+    ],
+    dlopen_enabled = True,
+    linker_flags = [
+        # Trim runtime `DT_NEEDED` deps.
+        "--as-needed",
+        # Use a version script to prevent exporting any symbols.
+        "--version-script=$(location :libFollySegFault.so.v)",
+    ] + select({
+        "DEFAULT": [],
+        # Statically link libstdc++ to avoid an external dep.
+        "ovr_config//os:linux": [
+            "--push-state",
+            "-Bstatic",
+            "-lstdc++",
+            "--pop-state",
+        ],
+        "ovr_config//runtime:fbcode": [
+            # fbcode toolchain uses the PIC variant.
+            "--push-state",
+            "-Bstatic",
+            "-lstdc++_pic",
+            "--pop-state",
+        ],
+    }),
+    target_compatible_with = ["fbcode//opensource/macros:broken-in-oss"],
+    deps = [
+        "//folly:range",
+        "//folly/debugging/symbolizer:symbolizer",
+    ],
+)

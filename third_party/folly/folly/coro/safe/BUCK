@@ -1,0 +1,55 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "async_closure_fwd",
+    headers = ["AsyncClosure-fwd.h"],
+)
+
+fb_dirsync_cpp_library(
+    name = "bind_captures",
+    headers = ["BindCaptures.h"],
+    exported_deps = ["//folly/lang/bind:bind"],
+)
+
+fb_dirsync_cpp_library(
+    name = "captures",
+    headers = ["Captures.h"],
+    exported_deps = [
+        ":async_closure_fwd",
+        "//folly:portability",
+        "//folly:traits",
+        "//folly:utility",
+        "//folly/coro/safe/detail:define_movable_deep_const_lref_copyable",
+        "//folly/detail:tuple",
+        "//folly/lang:safe_alias_fwd",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "async_closure",
+    headers = ["AsyncClosure.h"],
+    exported_deps = [
+        "//folly/coro/safe/detail:async_closure",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "now_task",
+    headers = ["NowTask.h"],
+    exported_deps = [
+        "//folly/coro:task_wrapper",
+        "//folly/lang:safe_alias_fwd",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "safe_task",
+    headers = ["SafeTask.h"],
+    exported_deps = [
+        ":now_task",
+        "//folly/coro:task_wrapper",
+        "//folly/lang:safe_alias",
+    ],
+)

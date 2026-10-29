@@ -1,0 +1,30 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "hazptr_lock_free_lifo",
+    headers = ["HazptrLockFreeLIFO.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/synchronization:hazptr",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "hazptr_swmr_set",
+    headers = ["HazptrSWMRSet.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/synchronization:hazptr",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "hazptr_wide_cas",
+    headers = ["HazptrWideCAS.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/synchronization:hazptr",
+    ],
+)

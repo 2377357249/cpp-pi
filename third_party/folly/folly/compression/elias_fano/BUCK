@@ -1,0 +1,43 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "bit_vector_coding",
+    headers = ["BitVectorCoding.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:likely",
+        "//folly:portability",
+        "//folly:range",
+        "//folly/compression:instructions",
+        "//folly/compression:select64",
+        "//folly/compression/elias_fano:coding_detail",
+        "//folly/lang:bits",
+        "//folly/lang:bits_class",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "coding_detail",
+    headers = ["CodingDetail.h"],
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "elias_fano_coding",
+    headers = ["EliasFanoCoding.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:likely",
+        "//folly:portability",
+        "//folly:range",
+        "//folly/compression:instructions",
+        "//folly/compression:select64",
+        "//folly/compression/elias_fano:coding_detail",
+        "//folly/lang:assume",
+        "//folly/lang:bits",
+    ],
+)

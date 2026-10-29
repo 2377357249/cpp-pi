@@ -1,0 +1,87 @@
+load("@fbcode_macros//build_defs:python_library.bzl", "python_library")
+load("@fbcode_macros//build_defs:python_unittest.bzl", "python_unittest")
+load("@fbsource//tools/build_defs/testinfra:network_access_utils.bzl", "network_access_utils")
+
+oncall("fbcode_entropy_wardens_folly")
+
+python_library(
+    name = "run_scenario_lib",
+    srcs = [
+        "checkpoint.py",
+        "checkpoint_accounting.py",
+        "compress_checkpoint_outputs.py",
+        "debrief_tables.py",
+        "directory_snapshot.py",
+        "run_scenario.py",
+    ],
+    resources = {
+        "fbcode//folly/agents/scripts:apply_diffs": "folly/agents/scripts/apply_diffs",
+    },
+    deps = ["fbcode//folly/agents/scripts:isolated_agent_lib"],
+)
+
+python_unittest(
+    name = "directory_snapshot_test",
+    srcs = ["test_directory_snapshot.py"],
+    network_access = network_access_utils.none(),
+    deps = [":run_scenario_lib"],
+)
+
+python_unittest(
+    name = "checkpoint_test",
+    srcs = ["test_checkpoint.py"],
+    network_access = network_access_utils.none(),
+    use_opt_by_default = True,
+    deps = [":run_scenario_lib"],
+)
+
+python_unittest(
+    name = "checkpoint_accounting_test",
+    srcs = ["test_checkpoint_accounting.py"],
+    network_access = network_access_utils.none(),
+    use_opt_by_default = True,
+    deps = [":run_scenario_lib"],
+)
+
+python_unittest(
+    name = "compress_checkpoint_outputs_test",
+    srcs = ["test_compress_checkpoint_outputs.py"],
+    network_access = network_access_utils.none(),
+    use_opt_by_default = True,
+    deps = [":run_scenario_lib"],
+)
+
+python_unittest(
+    name = "debrief_tables_test",
+    srcs = ["test_debrief_tables.py"],
+    network_access = network_access_utils.none(),
+    use_opt_by_default = True,
+    deps = [":run_scenario_lib"],
+)
+
+python_unittest(
+    name = "run_scenario_test",
+    srcs = ["test_run_scenario.py"],
+    env = {
+        "FOLLY_TEST_GIT": "$(exe_target fbsource//third-party/git/v2.53.0:git)",
+    },
+    network_access = network_access_utils.none(),
+    use_opt_by_default = True,
+    deps = [":run_scenario_lib"],
+)
+
+python_unittest(
+    name = "isolated_agent_test",
+    srcs = ["test_isolated_agent.py"],
+    network_access = network_access_utils.none(),
+    use_opt_by_default = True,
+    deps = ["fbcode//folly/agents/scripts:isolated_agent_lib"],
+)
+
+python_unittest(
+    name = "isolated_codex_test",
+    srcs = ["test_isolated_codex.py"],
+    network_access = network_access_utils.none(),
+    use_opt_by_default = True,
+    deps = ["fbcode//folly/agents/scripts:isolated_codex_cli_lib"],
+)

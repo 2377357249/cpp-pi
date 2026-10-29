@@ -1,0 +1,38 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rust_library.bzl", "fb_dirsync_rust_library")
+
+oncall("rust_libraries")
+
+fb_dirsync_cpp_library(
+    name = "logging-ffi",
+    srcs = [
+        "logging.cpp",
+    ],
+    headers = [
+        "logging.h",
+    ],
+    preferred_linkage = "static",
+    undefined_symbols = True,
+    deps = [
+        "//folly:range",
+        "//folly/logging:init",
+        "//folly/logging:logging",
+    ],
+    exported_deps = [
+        "fbsource//third-party/rust:cxx-core",
+    ],
+)
+
+fb_dirsync_rust_library(
+    name = "logging",
+    srcs = ["lib.rs"],
+    cpp_deps = [
+        ":logging-ffi",
+    ],
+    cxx_bridge = "lib.rs",
+    modifiers = ["ovr_config//project/folly:folly[fbcode]"],
+    deps = [
+        "fbsource//third-party/rust:cxx",
+        "//common/rust/shed/fbinit:fbinit",
+    ],
+)

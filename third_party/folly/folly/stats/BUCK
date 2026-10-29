@@ -1,0 +1,143 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "bucketed_time_series",
+    headers = [
+        "BucketedTimeSeries.h",
+        "BucketedTimeSeries-inl.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:likely",
+        "//folly/stats/detail:bucket",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "digest_builder",
+    srcs = [],
+    headers = [
+        "DigestBuilder.h",
+        "DigestBuilder-inl.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:memory",
+        "//folly:spin_lock",
+        "//folly/concurrency:cache_locality",
+        "//folly/lang:bits",
+        "//folly/memory:allocator",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "histogram",
+    headers = [
+        "Histogram.h",
+        "Histogram-inl.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:c_portability",
+        "//folly:conv",
+        "//folly:traits",
+        "//folly/lang:exception",
+        "//folly/stats/detail:bucket",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "multi_level_time_series",
+    headers = [
+        "MultiLevelTimeSeries.h",
+        "MultiLevelTimeSeries-inl.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        ":bucketed_time_series",
+        "//folly:constexpr_math",
+        "//folly:string",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "quantile_estimator",
+    srcs = [
+        "QuantileEstimator.cpp",
+    ],
+    headers = [
+        "QuantileEstimator.h",
+        "QuantileEstimator-inl.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":tdigest",
+        "//folly/stats/detail:buffered_stat",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "quantile_histogram",
+    headers = [
+        "QuantileHistogram.h",
+        "QuantileHistogram-inl.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:conv",
+        "//folly:glog",
+        "//folly:range",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "streaming_stats",
+    headers = [
+        "StreamingStats.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/lang:exception",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "tdigest",
+    srcs = [
+        "TDigest.cpp",
+    ],
+    headers = [
+        "TDigest.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:overload",
+        "//folly/algorithm:binary_heap",
+        "//folly/lang:exception",
+        "//folly/memory:malloc",
+        "//folly/stats/detail:double_radix_sort",
+    ],
+    exported_deps = [
+        "//folly:range",
+        "//folly:utility",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "timeseries_histogram",
+    headers = [
+        "TimeseriesHistogram.h",
+        "TimeseriesHistogram-inl.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":histogram",
+        ":multi_level_time_series",
+    ],
+)

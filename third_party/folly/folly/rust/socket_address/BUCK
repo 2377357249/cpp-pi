@@ -1,0 +1,30 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rust_library.bzl", "fb_dirsync_rust_library")
+
+oncall("rust_libraries")
+
+fb_dirsync_rust_library(
+    name = "socket_address",
+    srcs = ["lib.rs"],
+    cpp_deps = [
+        ":socket_address-ffi",
+    ],
+    crate_root = "lib.rs",
+    cxx_bridge = "lib.rs",
+    deps = [
+        "fbsource//third-party/rust:anyhow",
+        "fbsource//third-party/rust:cxx",
+        "//folly/rust/network_address:network_address",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "socket_address-ffi",
+    srcs = ["RustSocketAddress.cpp"],
+    headers = ["RustSocketAddress.h"],
+    preferred_linkage = "static",
+    undefined_symbols = True,  # defined by :socket_address
+    exported_deps = [
+        "//folly:network_address",
+    ],
+)

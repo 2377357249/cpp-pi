@@ -1,0 +1,94 @@
+load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
+load("@fbcode_macros//build_defs:custom_unittest.bzl", "custom_unittest")
+load("@fbsource//tools/build_defs:fb_native_wrapper.bzl", "fb_native")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rule.bzl", "fb_dirsync_rule")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "async_stack_test_utils",
+    headers = ["AsyncStackTestUtils.h"],
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:utility",
+        "//folly/portability:sys_mman",
+        "//folly/tracing:async_stack",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_stack_test",
+    srcs = ["AsyncStackTest.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        ":async_stack_test_utils",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/tracing:async_stack",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "static_tracepoint_test",
+    srcs = ["StaticTracepointTest.cpp"],
+    extract_helper_lib = False,
+    labels = ["oss-broken"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        ":static_tracepoint_test_module",
+        "//folly:conv",
+        "//folly:format",
+        "//folly:random",
+        "//folly:string",
+        "//folly:subprocess",
+        "//folly/debugging/symbolizer/detail:debug",
+        "//folly/lang:bits",
+        "//folly/portability:filesystem",
+        "//folly/portability:gtest",
+        "//folly/portability:unistd",
+        "//folly/tracing:static_tracepoint",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "static_tracepoint_test_module",
+    srcs = [
+        "StaticTracepointTestModule.cpp",
+    ],
+    headers = [
+        "StaticTracepointTestModule.h",
+    ],
+    deps = [
+        "//folly/tracing:static_tracepoint",
+    ],
+)
+
+fb_native.filegroup(
+    name = "static_tracepoint_section_test_lds",
+    srcs = ["StaticTracepointSectionTest.lds"],
+)
+
+fb_dirsync_rule(
+    name = "static_tracepoint_section_test_bin",
+    srcs = ["StaticTracepointSectionTest.cpp"],
+    fbcode_rule = cpp_binary,
+    linker_flags = [
+        "--gc-sections",
+        "-T",
+        "$(location :static_tracepoint_section_test_lds)/StaticTracepointSectionTest.lds",
+    ],
+    target_compatible_with = ["fbcode//opensource/macros:broken-in-oss"],
+    deps = [
+        "//folly/debugging/symbolizer:elf",
+        "//folly/tracing:static_tracepoint",
+    ],
+)
+
+fb_dirsync_rule(
+    name = "static_tracepoint_section_test",
+    command = ["$(location :static_tracepoint_section_test_bin)"],
+    fbcode_rule = custom_unittest,
+    type = "simple",
+)

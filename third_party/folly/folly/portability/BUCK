@@ -1,0 +1,522 @@
+load("@fbsource//tools/build_defs:fbsource_utils.bzl", "is_arvr_mode")
+load(
+    "@fbsource//tools/build_defs:platform_defs.bzl",
+    "ALL_APPLE_SDKS",
+)
+load("@fbsource//tools/build_defs:selects.bzl", "selects")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load(
+    "@fbsource//xplat/folly:defs.bzl",
+    "WINDOWS_CLANG_CXX_FLAGS",
+    "should_enable_gflags",
+)
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "asm",
+    headers = ["Asm.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "atomic",
+    headers = ["Atomic.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "builtins",
+    srcs = ["Builtins.cpp"],
+    headers = ["Builtins.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    deps = [
+        ":windows",
+    ],
+    exported_deps = [
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "config",
+    headers = ["Config.h"],
+    apple_sdks = ALL_APPLE_SDKS,
+    fbobjc_exported_preprocessor_flags = [
+        "-DFOLLY_ASSUME_NO_JEMALLOC=1",
+        "-DFOLLY_ASSUME_NO_TCMALLOC=1",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:config",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "constexpr",
+    headers = ["Constexpr.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:c_portability",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "dirent",
+    srcs = ["Dirent.cpp"],
+    headers = ["Dirent.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":windows",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "event",
+    headers = ["Event.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/libevent:libevent",
+        ":fcntl",
+        ":windows",
+        "//folly/net/detail:socket_file_descriptor_map",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "fcntl",
+    srcs = ["Fcntl.cpp"],
+    headers = ["Fcntl.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":sockets",
+        ":sys_stat",
+        ":windows",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "filesystem",
+    srcs = ["Filesystem.cpp"],
+    headers = ["Filesystem.h"],
+    use_raw_headers = True,
+    # stdc++fs was needed for GCC <9; all active platform010 builds use GCC 11.x
+    # where <filesystem> is part of libstdc++ itself.  The centos8 redhat
+    # toolchain (libstdc++ 8.5.0) still needs it, but no centos8 target is known
+    # to depend on this target.  The prebuilt libstdc++fs.a is also non-PIC,
+    # which breaks shared-library links (T267176152).
+    exported_deps = [],
+)
+
+fb_dirsync_cpp_library(
+    name = "fmt_compile",
+    headers = ["FmtCompile.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/fmt:fmt",
+    ],
+)
+
+# because certain arvr builds duplicate gflags and do this in an exec dependency, we need this until we fix that behavior.
+_GFLAGS_DEPS = [
+    "fbsource//arvr/third-party/gflags:gflags" if is_arvr_mode() else "fbsource//third-party/gflags:gflags",
+]
+
+fb_dirsync_cpp_library(
+    # @autodeps-skip
+    name = "gflags",
+    srcs = select({
+        "DEFAULT": [],
+        "ovr_config//runtime:fbcode": ["GFlags.cpp"],
+    }),
+    headers = ["GFlags.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    exported_preprocessor_flags = select({
+        "DEFAULT": ["-DFOLLY_HAVE_LIBGFLAGS=1"] if should_enable_gflags() else ["-DFOLLY_HAVE_LIBGFLAGS=0"],
+        "fbsource//xplat/folly/buck_config:folly-gflags-enabled": ["-DFOLLY_HAVE_LIBGFLAGS=1"],
+        "ovr_config//os:linux": ["-DFOLLY_HAVE_LIBGFLAGS=1"],
+        "ovr_config//os:macos": ["-DFOLLY_HAVE_LIBGFLAGS=1"],
+        "ovr_config//os:windows": ["-DFOLLY_HAVE_LIBGFLAGS=1"],
+        # In some cases, fbandroid suffixed rules can build with the fbcode platforms.
+        "ovr_config//runtime:fbcode": ["-DFOLLY_HAVE_LIBGFLAGS=1"],
+    }),
+    use_raw_headers = True,
+    exported_deps = [":config"]
+    + selects.with_or({
+        "DEFAULT": _GFLAGS_DEPS if should_enable_gflags() else [],
+        (
+            "fbsource//xplat/folly/buck_config:folly-gflags-enabled",
+            "ovr_config//os:linux",
+            "ovr_config//os:macos",
+            "ovr_config//os:windows",
+            "ovr_config//runtime:fbcode",
+        ): _GFLAGS_DEPS,
+    }),
+)
+
+fb_dirsync_cpp_library(
+    name = "gmock",
+    headers = ["GMock.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "gtest",
+    headers = ["GTest.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/googletest:gtest",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "gtest_prod",
+    headers = ["GTestProd.h"],
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "iovec",
+    headers = ["IOVec.h"],
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "libgen",
+    srcs = ["Libgen.cpp"],
+    headers = ["Libgen.h"],
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "libunwind",
+    headers = ["Libunwind.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/portability/provide:libunwind",  # @manual
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "malloc",
+    srcs = ["Malloc.cpp"],
+    headers = ["Malloc.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":config",
+        "//folly:c_portability",
+    ] + select({
+        "DEFAULT": [],
+        "ovr_config//os:linux": ["fbsource//third-party/jemalloc:headers"],
+    }),
+)
+
+fb_dirsync_cpp_library(
+    name = "memory",
+    headers = ["Memory.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:memory",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "openssl",
+    srcs = ["OpenSSL.cpp"],
+    headers = ["OpenSSL.h"],
+    compiler_flags = select({
+        "DEFAULT": [],
+        "ovr_config//compiler:clang": [
+            "-Wno-unused-function",
+        ],
+    }),
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//xplat/third-party/openssl:crypto",
+        "fbsource//xplat/third-party/openssl:ssl",
+        ":windows",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "pthread",
+    srcs = ["PThread.cpp"],
+    headers = ["PThread.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/boost:boost",
+        "fbsource//third-party/boost:boost_thread",
+        "//folly/lang:assume",
+    ],
+    exported_deps = [
+        "fbsource//third-party/glibc:pthread",
+        ":config",
+        ":sched",
+        ":time",
+        ":windows",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "sched",
+    srcs = ["Sched.cpp"],
+    headers = ["Sched.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "sockets",
+    srcs = ["Sockets.cpp"],
+    headers = ["Sockets.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    deps = [
+        "//folly:scope_guard",
+        "//folly/net:network_socket",
+        "//folly/net/detail:socket_file_descriptor_map",
+    ],
+    exported_deps = [
+        "//folly:portability",
+        "//folly/net:net_ops",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "source_location",
+    headers = ["SourceLocation.h"],
+    compiler_flags = select({
+        "DEFAULT": [],
+        "ovr_config//os:macos": [
+            "-Wno-nonportable-include-path",
+        ],
+    }),
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "stdio",
+    srcs = ["Stdio.cpp"],
+    headers = ["Stdio.h"],
+    use_raw_headers = True,
+    deps = [
+        ":unistd",
+        "//folly:scope_guard",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "stdlib",
+    srcs = ["Stdlib.cpp"],
+    headers = ["Stdlib.h"],
+    compiler_flags = select({
+        "DEFAULT": [],
+        "ovr_config//os:windows-clang": WINDOWS_CLANG_CXX_FLAGS,
+    }),
+    use_raw_headers = True,
+    deps = [
+        ":fcntl",
+        ":sys_stat",
+        ":windows",
+    ],
+    exported_deps = [
+        ":config",
+        "//folly:c_portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "string",
+    srcs = ["String.cpp"],
+    headers = ["String.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [":config"],
+)
+
+fb_dirsync_cpp_library(
+    name = "sys_file",
+    srcs = ["SysFile.cpp"],
+    headers = ["SysFile.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    deps = [
+        ":windows",
+        "//folly:c_portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "sys_membarrier",
+    srcs = ["SysMembarrier.cpp"],
+    headers = ["SysMembarrier.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    deps = [
+        ":sys_syscall",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "sys_mman",
+    srcs = ["SysMman.cpp"],
+    headers = ["SysMman.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    deps = [
+        ":windows",
+        "//folly:portability",
+    ],
+    exported_deps = [
+        "fbsource//third-party/glibc:rt",
+        ":sys_types",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "sys_resource",
+    srcs = ["SysResource.cpp"],
+    headers = ["SysResource.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    deps = [
+        ":windows",
+    ],
+    exported_deps = [
+        ":sys_time",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "sys_stat",
+    srcs = ["SysStat.cpp"],
+    headers = ["SysStat.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    deps = [
+        ":windows",
+    ],
+    exported_deps = [
+        ":sys_types",
+        "//folly:c_portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "sys_syscall",
+    headers = ["SysSyscall.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:c_portability",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "sys_time",
+    srcs = ["SysTime.cpp"],
+    headers = ["SysTime.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [":windows"],
+)
+
+fb_dirsync_cpp_library(
+    name = "sys_types",
+    headers = ["SysTypes.h"],
+    apple_sdks = ALL_APPLE_SDKS,
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "sys_uio",
+    srcs = ["SysUio.cpp"],
+    headers = ["SysUio.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    deps = [
+        ":sockets",
+        ":sys_file",
+        ":unistd",
+        "//folly:scope_guard",
+    ],
+    exported_deps = [
+        ":config",
+        ":iovec",
+        ":sys_types",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "syslog",
+    headers = ["Syslog.h"],
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "time",
+    srcs = ["Time.cpp"],
+    headers = ["Time.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    deps = [
+        ":windows",
+        "//folly:c_portability",
+        "//folly:likely",
+        "//folly:utility",
+    ],
+    exported_deps = [
+        "fbsource//third-party/glibc:rt",
+        ":config",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "unistd",
+    srcs = ["Unistd.cpp"],
+    headers = ["Unistd.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    deps = [
+        ":sockets",
+        ":windows",
+        "//folly/net/detail:socket_file_descriptor_map",
+    ],
+    exported_deps = [
+        ":sys_types",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "windows",
+    headers = ["Windows.h"],
+    use_raw_headers = True,
+    exported_deps = select({
+        "DEFAULT": [],
+        "ovr_config//os:windows": [
+            "fbsource//third-party/toolchains/win:ws2_32.lib",
+        ],
+    }),
+)

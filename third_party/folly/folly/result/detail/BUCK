@@ -1,0 +1,71 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "immortal_exception_storage",
+    headers = ["immortal_exception_storage.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/lang:exception",
+        "//folly/result:rich_error_fwd",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "ptr_immortal_exception_storage",
+    headers = ["ptr_immortal_exception_storage.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/lang:safe_assert",
+        "//folly/result:rich_error_base",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "result_promise",
+    headers = ["result_promise.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/coro:coroutine",
+        "//folly/coro:detail_malloc",
+        "//folly/result:epitaph",
+        "//folly/result:result",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "result_or_unwind",
+    headers = ["result_or_unwind.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":result_promise",
+        "//folly:cpp_attributes",
+        "//folly/coro:error",
+        "//folly/lang:must_use_immediately",
+        "//folly/result:result",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "rich_error_common",
+    headers = ["rich_error_common.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:traits",
+        "//folly/lang:pretty",
+        "//folly/result:rich_error_base",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "rich_exception_ptr_storage",
+    srcs = ["rich_exception_ptr_storage.cpp"],
+    headers = ["rich_exception_ptr_storage.h"],
+    use_raw_headers = True,
+    deps = ["fbsource//third-party/glog:glog"],
+    exported_deps = [
+        ":immortal_exception_storage",
+        "//folly:portability",
+    ],
+)

@@ -1,0 +1,48 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "bind_test",
+    srcs = ["BindTest.cpp"],
+    deps = [
+        "//folly/lang/bind:bind",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "named_test",
+    srcs = ["NamedTest.cpp"],
+    deps = [
+        "//folly/lang/bind:named",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "named_to_storage_test",
+    srcs = ["NamedToStorageTest.cpp"],
+    deps = [
+        "//folly/lang/bind:named_to_storage",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "to_storage_test",
+    srcs = ["ToStorageTest.cpp"],
+    deps = [
+        "//folly/lang/bind:to_storage",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "as_argument_test",
+    srcs = ["AsArgumentTest.cpp"],
+    deps = [
+        "//folly/lang/bind:as_argument",
+        "//folly/portability:gtest",
+    ],
+)

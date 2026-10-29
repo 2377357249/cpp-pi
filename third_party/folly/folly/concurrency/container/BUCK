@@ -1,0 +1,77 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "atomic_grow_array",
+    headers = [
+        "atomic_grow_array.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:c_portability",
+        "//folly:constexpr_math",
+        "//folly:likely",
+        "//folly:scope_guard",
+        "//folly/lang:align",
+        "//folly/lang:bits",
+        "//folly/lang:new",
+        "//folly/synchronization:atomic_util",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "flat_combining_priority_queue",
+    headers = ["FlatCombiningPriorityQueue.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:optional",
+        "//folly/detail:futex",
+        "//folly/synchronization:flat_combining",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "lock_free_ring_buffer",
+    headers = ["LockFreeRingBuffer.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/boost:boost",  # @manual
+        "//folly:portability",
+        "//folly:traits",
+        "//folly/detail:turn_sequencer",
+        "//folly/portability:unistd",
+        "//folly/synchronization:sanitize_thread",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "relaxed_concurrent_priority_queue",
+    headers = [
+        "RelaxedConcurrentPriorityQueue.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:random",
+        "//folly:spin_lock",
+        "//folly:thread_local",
+        "//folly/detail:futex",
+        "//folly/lang:align",
+        "//folly/synchronization:hazptr",
+        "//folly/synchronization:wait_options",
+        "//folly/synchronization/detail:spin",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "single_writer_fixed_hash_map",
+    headers = [
+        "SingleWriterFixedHashMap.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly/lang:bits",
+    ],
+)

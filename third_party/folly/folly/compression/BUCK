@@ -1,0 +1,150 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "compression",
+    srcs = [
+        "Compression.cpp",
+        "Zlib.cpp",
+        "Zstd.cpp",
+    ],
+    headers = [
+        "Compression.h",
+        "Utils.h",
+        "Zlib.h",
+        "Zstd.h",
+    ],
+    compiler_flags = [
+        "-DLZ4_STATIC_LINKING_ONLY",
+        "-DLZ4_HC_STATIC_LINKING_ONLY",
+        "-DLZ4F_STATIC_LINKING_ONLY",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "fbsource//third-party/lz4:lz4",
+        ":compression_context_pool_singletons",
+        "//folly:conv",
+        "//folly:random",
+        "//folly:scope_guard",
+        "//folly:utility",
+        "//folly:varint",
+        "//folly/portability:windows",
+    ] + select({
+        "DEFAULT": [],
+        "ovr_config//os:linux": [
+            "fbsource//third-party/bzip2:bzlib2",
+            "fbsource//third-party/xz:lzma",
+            "fbsource//xplat/third-party/snappy:snappy",
+        ],
+        "ovr_config//os:windows": [
+            "fbsource//third-party/bzip2:bzlib2",
+            "fbsource//third-party/xz:lzma",
+            "fbsource//xplat/third-party/snappy:snappy",
+        ],
+    }),
+    exported_deps = [
+        "fbsource//third-party/zlib:z",
+        "fbsource//third-party/zstd:zstd",
+        "//folly:memory",
+        "//folly:optional",
+        "//folly:portability",
+        "//folly:range",
+        "//folly/io:iobuf",
+        "//folly/lang:bits",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "compression_context_pool",
+    srcs = [],
+    headers = [
+        "CompressionContextPool.h",
+        "CompressionCoreLocalContextPool.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:memory",
+        "//folly:synchronized",
+        "//folly/concurrency:cache_locality",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "compression_context_pool_singletons",
+    srcs = ["CompressionContextPoolSingletons.cpp"],
+    headers = ["CompressionContextPoolSingletons.h"],
+    fbandroid_preprocessor_flags = [
+        "-DFOLLY_COMPRESSION_USE_HUGEPAGES=0",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "//folly:portability",
+        "//folly/memory:jemalloc_huge_page_allocator",
+        "//folly/memory:malloc",
+        "//folly/system:hardware_concurrency",
+    ],
+    exported_deps = [
+        "fbsource//xplat/third-party/zstd:zstd",
+        ":compression_context_pool",
+        "//folly/portability:config",
+        "//folly/portability:gflags",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "quotient_multiset",
+    srcs = [
+        "QuotientMultiSet.cpp",
+    ],
+    headers = [
+        "QuotientMultiSet.h",
+        "QuotientMultiSet-inl.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "//folly:math",
+    ],
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:format",
+        "//folly:portability",
+        "//folly:range",
+        "//folly/compression:instructions",
+        "//folly/compression:select64",
+        "//folly/io:iobuf",
+        "//folly/lang:bits",
+        "//folly/lang:bits_class",
+        "//folly/lang:safe_assert",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "instructions",
+    headers = ["Instructions.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:cpu_id",
+        "//folly:portability",
+        "//folly/lang:assume",
+        "//folly/portability:builtins",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "select64",
+    srcs = ["Select64.cpp"],
+    headers = ["Select64.h"],
+    use_raw_headers = True,
+    deps = [
+        "//folly:constexpr_math",
+        "//folly:utility",
+    ],
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        ":instructions",
+        "//folly:portability",
+    ],
+)

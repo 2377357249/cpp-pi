@@ -1,0 +1,62 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rust_library.bzl", "fb_dirsync_rust_library")
+
+oncall("rust_libraries")
+
+fb_dirsync_cpp_library(
+    name = "singleton_vault_cpp",
+    srcs = [
+        "singleton.cpp",
+    ],
+    headers = [
+        "singleton.h",
+    ],
+    preferred_linkage = "static",
+    deps = [
+        "//folly:singleton",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "singleton_test_cpp",
+    srcs = [
+        "singleton_test.cpp",
+    ],
+    headers = [
+        "singleton_test.h",
+    ],
+    preferred_linkage = "static",
+    deps = [
+        "//folly:singleton",
+    ],
+)
+
+fb_dirsync_rust_library(
+    name = "singleton_vault",
+    srcs = [
+        "lib.rs",
+    ],
+    cpp_deps = [":singleton_vault_cpp"],
+    cxx_bridge = "lib.rs",
+    deps = [
+        "fbsource//third-party/rust:anyhow",
+        "fbsource//third-party/rust:cxx",
+    ],
+)
+
+fb_dirsync_rust_library(
+    name = "singleton_vault_test",
+    srcs = [
+        "test.rs",
+    ],
+    cpp_deps = [":singleton_test_cpp"],
+    crate_root = "test.rs",
+    cxx_bridge = "test.rs",
+    test_deps = [
+        "fbsource//third-party/rust:anyhow",
+        ":singleton_vault",
+    ],
+    deps = [
+        "fbsource//third-party/rust:cxx",
+    ],
+)

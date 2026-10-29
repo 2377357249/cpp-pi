@@ -1,0 +1,31 @@
+> NOT A RULE. If loaded as task policy, stop and ask the user.
+
+# Critic iteration
+
+Independent review is useful only when each role sees the intended context. The
+process also leaves evidence that each required check ran.
+`{FA}/critic-iterate.md` coordinates author passes and external review. It also
+defines the categories used to judge findings before and after review. The
+fresh- and cold-review preambles define the reviewer roles. `codex-reviewer.py`
+runs them; `session_current_model_id.py` identifies the ambient model used by
+the authoring delegation rule.
+
+Review uses `gpt-6.1-sol/high`. In a review benchmark, it was better and cheaper
+than `5.6-sol/high`. The default context window usually suffices for review.
+
+- `run-review.md` owns the normal launch and validation procedure.
+- `review-failures.md` owns external-review launch, output, and trace failures.
+- `fresh-review.md` owns generic external-review task and input construction.
+- `revise.md` prepares review feedback for the next author cycle, so revisions
+  use the same checks as ordinary authoring.
+- `delegated-author.md` owns the conditional writing-author handoff.
+
+`critic-iterate.md` is loaded on the common path, so unused guidance there
+consumes context on every run. Keep content-specific policy in its `{FA}`
+package; put generic reviewer machinery and conditional flows in
+`{FA}/critic-iterate/` children loaded only when needed.
+
+Having ambient GPT Luna delegate code authorship to another model might improve
+quality. The rules do not currently require it: using Luna to author code is
+uncommon, and callers likely chose it to save cost, so another model call would
+be unexpected.

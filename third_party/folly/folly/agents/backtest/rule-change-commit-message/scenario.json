@@ -1,0 +1,38 @@
+{
+  "prompt": "input/author-prompt.md",
+  "no_rules_prompt": "input/author-prompt.no-rules.md",
+  "inputs": [
+    {
+      "source": "input/request.md",
+      "destination": "request.md"
+    },
+    {
+      "source": "input/requirements.md",
+      "destination": "requirements.md"
+    },
+    {
+      "source": "input/conversation.md",
+      "destination": "conversation.md"
+    },
+    {
+      "source": "input/commit-state.md",
+      "destination": "commit-state.md"
+    },
+    {
+      "source": "input/change.patch",
+      "destination": "change.patch"
+    }
+  ],
+  "packages_under_test": [
+    "task-ledger",
+    "rule-conflicts",
+    "write",
+    "critic-iterate"
+  ],
+  "rules": [
+    "task-ledger.md",
+    "rule-conflicts.md",
+    "write.md",
+    "critic-iterate.md"
+  ]
+}

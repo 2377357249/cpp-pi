@@ -1,0 +1,211 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "dwarf",
+    srcs = [
+        "Dwarf.cpp",
+        "DwarfImpl.cpp",
+        "DwarfLineNumberVM.cpp",
+        "DwarfSection.cpp",
+        "DwarfUtil.cpp",
+    ],
+    headers = [
+        "Dwarf.h",
+        "DwarfImpl.h",
+        "DwarfLineNumberVM.h",
+        "DwarfSection.h",
+        "DwarfUtil.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "//folly:optional",
+        "//folly/lang:safe_assert",
+        "//folly/portability:config",
+        "//folly/portability:unistd",
+    ],
+    exported_deps = [
+        ":elf",
+        ":elf_cache",
+        ":symbolized_frame",
+        "//folly:function",
+        "//folly:range",
+        "//folly/portability/provide:libdwarf",  # @manual
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "elf",
+    srcs = [
+        "Elf.cpp",
+    ],
+    headers = [
+        "Elf.h",
+        "Elf-inl.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:exception",
+        "//folly:scope_guard",
+        "//folly/lang:c_string",
+        "//folly/portability:sys_mman",
+    ],
+    exported_deps = [
+        "//folly:conv",
+        "//folly:likely",
+        "//folly:range",
+        "//folly/lang:cstring_view",
+        "//folly/lang:safe_assert",
+        "//folly/portability:config",
+        "//folly/portability:unistd",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "elf_cache",
+    srcs = [
+        "ElfCache.cpp",
+    ],
+    headers = [
+        "ElfCache.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "//folly:c_portability",
+        "//folly:scope_guard",
+        "//folly/portability:sys_mman",
+    ],
+    exported_deps = [
+        "fbsource//third-party/boost:boost",
+        ":elf",
+        "//folly:optional",
+        "//folly:range",
+        "//folly/hash:hash",
+        "//folly/lang:cstring_view",
+        "//folly/memory:reentrant_allocator",
+        "//folly/portability:config",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "line_reader",
+    srcs = ["LineReader.cpp"],
+    headers = ["LineReader.h"],
+    use_raw_headers = True,
+    deps = [
+        "//folly:file_util",
+    ],
+    exported_deps = [
+        "//folly:range",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "stack_trace",
+    srcs = ["StackTrace.cpp"],
+    headers = ["StackTrace.h"],
+    use_raw_headers = True,
+    deps = [
+        "//folly:portability",
+        "//folly/portability:config",
+        "//folly/portability:libunwind",
+        "//folly/tracing:async_stack",
+    ],
+    exported_deps = [
+        "//folly:c_portability",
+        "//folly/portability:sys_types",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "symbolized_frame",
+    srcs = ["SymbolizedFrame.cpp"],
+    headers = ["SymbolizedFrame.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:range",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "symbol_cache",
+    srcs = ["SymbolCache.cpp"],
+    headers = ["SymbolCache.h"],
+    use_raw_headers = True,
+    deps = [
+        "//folly:indestructible",
+        "//folly:synchronized",
+        "//folly/container:evicting_cache_map",
+        "//folly/container:generational_cache_map",
+        "//folly/portability:gflags",
+    ],
+    exported_deps = [
+        ":symbolized_frame",
+        "//folly:small_vector",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "symbolize_printer",
+    exported_deps = [":symbolizer"],
+)
+
+fb_dirsync_cpp_library(
+    name = "symbolizer",
+    srcs = [
+        "SignalHandler.cpp",
+        "SignalHandlerWindows.cpp",
+        "SymbolizePrinter.cpp",
+        "Symbolizer.cpp",
+    ],
+    headers = [
+        "SignalHandler.h",
+        "SymbolizePrinter.h",
+        "Symbolizer.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        ":elf",
+        "//folly:demangle",
+        "//folly:file_util",
+        "//folly:indestructible",
+        "//folly:memory",
+        "//folly:portability",
+        "//folly:scope_guard",
+        "//folly:small_vector",
+        "//folly/debugging/symbolizer/detail:debug",
+        "//folly/lang:safe_assert",
+        "//folly/lang:to_ascii",
+        "//folly/memory:sanitize_address",
+        "//folly/portability:sys_mman",
+        "//folly/portability:sys_syscall",
+        "//folly/tracing:async_stack",
+    ],
+    exported_deps = [
+        ":dwarf",
+        ":elf_cache",
+        ":stack_trace",
+        ":symbol_cache",
+        ":symbolized_frame",
+        "//folly:fbstring",
+        "//folly:optional",
+        "//folly:range",
+        "//folly:string",
+        "//folly/io:iobuf",
+        "//folly/portability:config",
+        "//folly/portability:unistd",
+    ] + select({
+        "DEFAULT": [],
+        # DbgHelp drives StackWalk64 + SymFromAddr in the Windows VEH
+        # arm in SignalHandlerWindows.cpp.
+        "ovr_config//os:windows": ["fbsource//third-party/toolchains/win:dbghelp.lib"],
+    }),
+)
+
+fb_dirsync_cpp_library(
+    name = "signal_handler",
+    exported_deps = [":symbolizer"],
+)

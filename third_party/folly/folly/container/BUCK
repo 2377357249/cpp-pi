@@ -1,0 +1,440 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load(
+    "@fbsource//xplat/folly:defs.bzl",
+    "FBANDROID_CPPFLAGS",
+)
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "dynamic_ring_queue",
+    headers = ["DynamicRingQueue.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:likely",
+        "//folly/lang:bits",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "fixed_capacity_ring_queue",
+    headers = ["FixedCapacityRingQueue.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:likely",
+        "//folly/lang:bits",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "f14_hash",
+    headers = [
+        "F14Map.h",
+        "F14Set.h",
+    ],
+    fbandroid_exported_preprocessor_flags = FBANDROID_CPPFLAGS,
+    use_raw_headers = True,
+    exported_deps = [
+        ":f14_hash_fwd",
+        ":iterator",
+        ":view",
+        "//folly:cpp_attributes",
+        "//folly:portability",
+        "//folly:range",
+        "//folly:traits",
+        "//folly/container/detail:f14_hash_detail",
+        "//folly/container/detail:util",
+        "//folly/lang:exception",
+        "//folly/lang:safe_assert",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "collection_util",
+    headers = ["CollectionUtil.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/lang:exception",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "irange",
+    headers = ["irange.h"],
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "heterogeneous_access",
+    headers = [
+        "HeterogeneousAccess.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":heterogeneous_access_fwd",
+        "//folly:range",
+        "//folly:traits",
+        "//folly/hash:hash",
+        "//folly/hash:rapidhash",
+        "//folly/hash/detail:random_seed",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "heterogeneous_access_fwd",
+    headers = [
+        "HeterogeneousAccess-fwd.h",
+    ],
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "enumerate",
+    headers = ["Enumerate.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:c_portability",
+        "//folly/portability:sys_types",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "sparse_byte_set",
+    headers = ["SparseByteSet.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:c_portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "merge",
+    headers = ["Merge.h"],
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "evicting_cache_map",
+    headers = ["EvictingCacheMap.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/boost:boost",
+        "//folly/container:f14_hash",
+        "//folly/container:heterogeneous_access",
+        "//folly/lang:exception",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "generational_cache_map",
+    headers = ["GenerationalCacheMap.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:shared_mutex",
+        "//folly/concurrency:concurrent_hash_map",
+        "//folly/synchronization:hazptr",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "weighted_evicting_cache_map",
+    headers = [
+        "WeightedEvictingCacheMap.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/container:evicting_cache_map",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "view",
+    headers = ["View.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:portability",
+        "//folly/functional:invoke",
+        "//folly/lang:customization_point",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "foreach",
+    headers = [
+        "Foreach.h",
+        "Foreach-inl.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":access",
+        "//folly:portability",
+        "//folly:preprocessor",
+        "//folly:traits",
+        "//folly:utility",
+        "//folly/functional:invoke",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "f14_hash_fwd",
+    headers = [
+        "F14Map-fwd.h",
+        "F14Set-fwd.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/container/detail:f14_defaults",
+        "//folly/memory:memory_resource",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "iterator",
+    headers = ["Iterator.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":access",
+        "//folly:traits",
+        "//folly:utility",
+        "//folly/functional:invoke",
+        "//folly/lang:rvalue_reference_wrapper",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "bit_iterator",
+    headers = ["BitIterator.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/boost:boost",
+        "//folly:portability",
+        "//folly/container/detail:bit_iterator_detail",
+        "//folly/lang:bits",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "array",
+    headers = ["Array.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:c_portability",
+        "//folly:traits",
+        "//folly:utility",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "heap_vector_types",
+    headers = ["heap_vector_types.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":iterator",
+        ":range_traits",
+        "//folly:cpp_attributes",
+        "//folly:range",
+        "//folly:scope_guard",
+        "//folly:small_vector",
+        "//folly:traits",
+        "//folly:utility",
+        "//folly/functional:invoke",
+        "//folly/lang:exception",
+        "//folly/memory:memory_resource",
+        "//folly/portability:builtins",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "access",
+    headers = ["Access.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/functional:invoke",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "intrusive_heap",
+    headers = [
+        "IntrusiveHeap.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/boost:boost",
+        "fbsource//third-party/glog:glog",
+        "//folly:portability",
+        "//folly/lang:builtin",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "range_traits",
+    headers = ["range_traits.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:portability",
+        "//folly:traits",
+        "//folly:utility",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "regex_match_cache",
+    srcs = ["RegexMatchCache.cpp"],
+    headers = ["RegexMatchCache.h"],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/boost:boost_regex",
+        "fbsource//third-party/fmt:fmt",
+        "fbsource//third-party/glog:glog",
+        "//folly:map_util",
+        "//folly:string",
+        "//folly/portability:windows",
+        "//folly/synchronization:atomic_util",
+    ],
+    exported_deps = [
+        ":f14_hash",
+        ":reserve",
+        "//folly:chrono",
+        "//folly:function",
+        "//folly/hash:unique_hash_key",
+        "//folly/lang:bits",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "tape",
+    headers = [
+        "tape.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":iterator",
+        "//folly:portability",
+        "//folly:range",
+        "//folly/container/detail:tape_detail",
+        "//folly/memory:uninitialized_memory_hacks",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "reserve",
+    headers = [
+        "Reserve.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:likely",
+        "//folly:traits",
+        "//folly:utility",
+        "//folly/lang:exception",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "sorted_vector_types",
+    headers = ["sorted_vector_types.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":range_traits",
+        "//folly:cpp_attributes",
+        "//folly:scope_guard",
+        "//folly:small_vector",
+        "//folly:traits",
+        "//folly:utility",
+        "//folly/lang:access",
+        "//folly/lang:exception",
+        "//folly/memory:memory_resource",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "std_bitset",
+    headers = ["StdBitset.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:c_portability",
+        "//folly:likely",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "fbvector",
+    headers = ["FBVector.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:format_traits",
+        "//folly:likely",
+        "//folly:scope_guard",
+        "//folly:traits",
+        "//folly/lang:checked_math",
+        "//folly/lang:exception",
+        "//folly/lang:hint",
+        "//folly/memory:malloc",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "intrusive_list",
+    headers = ["IntrusiveList.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = ["fbsource//third-party/boost:boost"],
+)
+
+fb_dirsync_cpp_library(
+    name = "map_util",
+    headers = ["MapUtil.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:optional",
+        "//folly:range",
+        "//folly/functional:invoke",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "small_vector",
+    headers = ["small_vector.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/boost:boost",
+        "//folly:constexpr_math",
+        "//folly:format_traits",
+        "//folly:likely",
+        "//folly:portability",
+        "//folly:scope_guard",
+        "//folly:traits",
+        "//folly/functional:invoke",
+        "//folly/hash:hash",
+        "//folly/lang:align",
+        "//folly/lang:assume",
+        "//folly/lang:checked_math",
+        "//folly/lang:exception",
+        "//folly/memory:malloc",
+        "//folly/memory:sanitize_leak",
+        "//folly/portability:malloc",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "vector_bool",
+    headers = ["vector_bool.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/container/detail:bool_wrapper",
+        "//folly/memory:memory_resource",
+    ],
+)

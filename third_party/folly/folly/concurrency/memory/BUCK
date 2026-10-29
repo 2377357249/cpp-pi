@@ -1,0 +1,57 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "atomic_read_mostly_main_ptr",
+    srcs = [
+        "AtomicReadMostlyMainPtr.cpp",
+    ],
+    headers = [
+        "AtomicReadMostlyMainPtr.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "//folly/executors:inline_executor",
+    ],
+    exported_deps = [
+        "//folly:indestructible",
+        "//folly/concurrency/memory:read_mostly_shared_ptr",
+        "//folly/synchronization:rcu",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "read_mostly_shared_ptr",
+    headers = ["ReadMostlySharedPtr.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:function",
+        "//folly/concurrency/memory:tl_ref_count",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "primary_ptr",
+    headers = ["PrimaryPtr.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:function",
+        "//folly/futures:cleanup",
+        "//folly/futures:core",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "tl_ref_count",
+    headers = ["TLRefCount.h"],
+    compiler_flags = ["-fno-omit-frame-pointer"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:thread_local",
+        "//folly/synchronization:asymmetric_thread_fence",
+        "//folly/synchronization/detail:sleeper",
+    ],
+)

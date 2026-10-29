@@ -1,0 +1,21 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "binary_heap",
+    headers = ["BinaryHeap.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/lang:builtin",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "stable_radix_sort",
+    headers = ["StableRadixSort.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:traits",
+    ],
+)

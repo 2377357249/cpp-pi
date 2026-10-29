@@ -1,0 +1,48 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "simd_any_of_test",
+    srcs = [
+        "SimdAnyOfTest.cpp",
+    ],
+    deps = [
+        "//folly:range",
+        "//folly/algorithm/simd/detail:simd_any_of",
+        "//folly/algorithm/simd/detail:simd_platform",
+        "//folly/lang:cast",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "simd_for_each_test",
+    srcs = ["SimdForEachTest.cpp"],
+    deps = [
+        "//folly/algorithm/simd/detail:simd_for_each",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "traits_test",
+    srcs = ["TraitsTest.cpp"],
+    deps = [
+        "//folly/algorithm/simd/detail:traits",
+        "//folly/lang:bits",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "unroll_utils_test",
+    srcs = [
+        "UnrollUtilsTest.cpp",
+    ],
+    deps = [
+        "//folly/algorithm/simd/detail:unroll_utils",
+        "//folly/portability:gtest",
+    ],
+)

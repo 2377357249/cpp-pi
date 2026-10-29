@@ -1,0 +1,33 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "init",
+    srcs = [
+        "Init.cpp",
+    ],
+    headers = [
+        "Init.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        ":phase",
+        "//folly:singleton",
+        "//folly/debugging/symbolizer:symbolizer",
+        "//folly/logging:init",
+        "//folly/portability:config",
+        "//folly/portability:gflags",
+        "//folly/synchronization:hazptr_thread_pool_executor",
+    ],
+    exported_deps = [
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "phase",
+    srcs = ["Phase.cpp"],
+    headers = ["Phase.h"],
+)

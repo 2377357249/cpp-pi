@@ -1,0 +1,40 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "checksum_detail",
+    srcs = [
+        "ChecksumDetail.cpp",
+        "Crc32CombineDetail.cpp",
+        "Crc32cDetail.cpp",
+    ],
+    headers = ["ChecksumDetail.h"],
+    compiler_flags = select({
+        "DEFAULT": [],
+        "ovr_config//os:android-x86_64": ["-mpclmul"],
+    }),
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/boost:boost_preprocessor",
+        "//folly:bits",
+        "//folly:cpp_attributes",
+        "//folly:cpu_id",
+    ],
+    exported_deps = [
+        "//folly:portability",
+        "//folly/external/nvidia/hash:checksum",  # @manual
+        "//folly/external/nvidia/hash/detail:crc32c_detail",  # @manual
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "random_seed",
+    headers = [
+        "RandomSeed.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:portability",
+    ],
+)

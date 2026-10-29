@@ -1,0 +1,26 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "atomic_queue_test",
+    srcs = [
+        "AtomicQueueTest.cpp",
+    ],
+    deps = [
+        "//folly/channels/detail:atomic_queue",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "pointer_variant_test",
+    srcs = [
+        "PointerVariantTest.cpp",
+    ],
+    deps = [
+        "//folly/channels/detail:pointer_variant",
+        "//folly/portability:gtest",
+    ],
+)

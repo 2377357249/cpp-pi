@@ -1,0 +1,16 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_binary(
+    name = "huge_page_util",
+    srcs = ["HugePageUtil.cpp"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "fbsource//third-party/glog:glog",
+        "//folly:range",
+        "//folly/io:huge_pages",
+        "//folly/portability:gflags",
+        "//folly/system:memory_mapping",
+    ],
+)

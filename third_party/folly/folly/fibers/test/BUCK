@@ -1,0 +1,100 @@
+load("@fbsource//tools/build_defs:testpilot_defs.bzl", "tpx_labels")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_benchmark.bzl", "fb_dirsync_cpp_benchmark")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_benchmark(
+    name = "timed_mutex_benchmark",
+    srcs = ["TimedMutexBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly/coro:blocking_wait",
+        "//folly/coro:task",
+        "//folly/fibers:core_manager",
+        "//folly/fibers:fiber_manager_map",
+        "//folly/fibers:timed_mutex",
+        "//folly/init:init",
+        "//folly/io/async:async_base",
+        "//folly/io/async:scoped_event_base_thread",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "fibers_test",
+    srcs = ["FibersTest.cpp"],
+    headers = [],
+    labels = [tpx_labels.heavyweight],
+    deps = [
+        "//folly:conv",
+        "//folly:random",
+        "//folly/coro:blocking_wait",
+        "//folly/coro:gtest_helpers",
+        "//folly/coro:timeout",
+        "//folly/coro:with_cancellation",
+        "//folly/executors:cpu_thread_pool_executor",
+        "//folly/fibers:add_tasks",
+        "//folly/fibers:atomic_batch_dispatcher",
+        "//folly/fibers:batch_dispatcher",
+        "//folly/fibers:batch_semaphore",
+        "//folly/fibers:core_manager",
+        "//folly/fibers:event_base_loop_controller",
+        "//folly/fibers:executor_loop_controller",
+        "//folly/fibers:fiber_manager_map",
+        "//folly/fibers:generic_baton",
+        "//folly/fibers:semaphore",
+        "//folly/fibers:simple_loop_controller",
+        "//folly/fibers:timed_mutex",
+        "//folly/fibers:when_n",
+        "//folly/futures:core",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/portability:gtest",
+        "//folly/synchronization:lock",
+        "//folly/tracing:async_stack",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "fibers_test_app",
+    srcs = ["FibersTestApp.cpp"],
+    headers = [],
+    deps = [
+        "//folly:memory",
+        "//folly/fibers:core_manager",
+        "//folly/fibers:simple_loop_controller",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "stack_overflow",
+    srcs = ["StackOverflow.cpp"],
+    headers = [],
+    compiler_flags = ["-Wno-infinite-recursion"],
+    deps = [
+        "//folly/fibers:fiber_manager_map",
+        "//folly/init:init",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "semaphore_test",
+    srcs = ["SemaphoreTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/fibers:semaphore",
+        "//folly/portability:gtest",
+        "//folly/synchronization:relaxed_atomic",
+        "//folly/synchronization/detail:sleeper",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "batch_semaphore_test",
+    srcs = ["BatchSemaphoreTest.cpp"],
+    deps = [
+        "//folly/fibers:batch_semaphore",
+        "//folly/portability:gtest",
+    ],
+)

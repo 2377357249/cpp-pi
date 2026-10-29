@@ -1,0 +1,1546 @@
+load("@fbcode_macros//build_defs:build_file_migration.bzl", "fbcode_target", "non_fbcode_target")
+load("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark")
+load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+load("@fbsource//tools/build_defs:testpilot_defs.bzl", "tpx_labels")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+load("../../../defs.bzl", "folly_xplat_cxx_library", "folly_xplat_cxx_test")
+load("../../../io/async/test/certs/defs.bzl", "alias_pem")
+
+oncall("fbcode_entropy_wardens_folly")
+
+non_fbcode_target(
+    _kind = folly_xplat_cxx_library,
+    name = "test_ssl_server",
+    srcs = [
+        "TestSSLServer.cpp",
+    ],
+    raw_headers = [
+        "TestSSLServer.h",
+    ],
+    resources = {
+        "certs/ca-cert.pem": "//xplat/folly/io/async/test/certs:ca-cert.pem",
+        "certs/client_ca_cert.pem": "//xplat/folly/io/async/test/certs:client_ca_cert.pem",
+        "certs/client_cert.pem": "//xplat/folly/io/async/test/certs:client_cert.pem",
+        "certs/client_chain.pem": "//xplat/folly/io/async/test/certs:client_chain.pem",
+        "certs/client_key.pem": "//xplat/folly/io/async/test/certs:client_key.pem",
+        "certs/tests-cert.pem": "//xplat/folly/io/async/test/certs:tests-cert.pem",
+        "certs/tests-key.pem": "//xplat/folly/io/async/test/certs:tests-key.pem",
+    },
+    deps = [
+        "fbsource//xplat/folly/portability:openssl",
+    ],
+    exported_deps = [
+        "fbsource//xplat/folly/portability:gtest",
+        "fbsource//xplat/folly/portability:sockets",
+        "fbsource//xplat/folly/portability:unistd",
+        ":callback_state_enum",
+        "//xplat/folly:network_address",
+        "//xplat/folly/io/async:async_base",
+        "//xplat/folly/io/async:async_socket",
+        "//xplat/folly/io/async:async_ssl_socket",
+        "//xplat/folly/io/async:async_transport",
+        "//xplat/folly/io/async:server_socket",
+        "//xplat/folly/io/async/ssl:ssl_errors",
+        "//xplat/folly/testing:test_util",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "tfo_util",
+    srcs = [
+        "TFOUtil.cpp",
+    ],
+    headers = [
+        "TFOUtil.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "//folly/detail:socket_fast_open",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "async_signal_handler_test_lib",
+    headers = [
+        "AsyncSignalHandlerTestLib.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":util",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_signal_handler",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_pipe_test",
+    srcs = ["AsyncPipeTest.cpp"],
+    oncall = "secure_pipes",
+    supports_static_listing = False,
+    deps = [
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_pipe",
+        "//folly/portability:gtest",
+        "//folly/portability:unistd",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "async_ssl_socket_test_lib",
+    headers = [
+        "AsyncSSLSocketTest.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":test_ssl_server",
+        "//folly:exception_wrapper",
+        "//folly:network_address",
+        "//folly/fibers:fiber_manager_map",
+        "//folly/io:socket_option_map",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:async_ssl_socket",
+        "//folly/io/async:async_transport",
+        "//folly/io/async:server_socket",
+        "//folly/io/async/ssl:ssl_errors",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/portability:pthread",
+        "//folly/portability:sockets",
+        "//folly/portability:string",
+        "//folly/portability:unistd",
+        "//folly/testing:test_util",
+    ],
+)
+
+non_fbcode_target(
+    _kind = folly_xplat_cxx_test,
+    name = "async_ssl_socket_test",
+    srcs = [
+        "AsyncSSLSocketTest.cpp",
+        "AsyncSSLSocketTest2.cpp",
+    ],
+    oncall = "secure_pipes",
+    resources = {
+        "certs/ca-cert.pem": "//xplat/folly/io/async/test/certs:ca-cert.pem",
+        "certs/client_ca_cert.pem": "//xplat/folly/io/async/test/certs:client_ca_cert.pem",
+        "certs/client_cert.pem": "//xplat/folly/io/async/test/certs:client_cert.pem",
+        "certs/client_key.pem": "//xplat/folly/io/async/test/certs:client_key.pem",
+        "certs/tests-cert.pem": "//xplat/folly/io/async/test/certs:tests-cert.pem",
+        "certs/tests-key.pem": "//xplat/folly/io/async/test/certs:tests-key.pem",
+    },
+    deps = [
+        "fbsource//xplat/folly/futures:core",
+        "fbsource//xplat/folly/init:init",
+        "fbsource//xplat/folly/io:iobuf",
+        "fbsource//xplat/folly/io:socket_option_map",
+        "fbsource//xplat/folly/portability:gmock",
+        "fbsource//xplat/folly/portability:gtest",
+        "fbsource//xplat/folly/portability:openssl",
+        "fbsource//xplat/folly/portability:pthread",
+        "fbsource//xplat/folly/portability:sockets",
+        "fbsource//xplat/folly/portability:string",
+        "fbsource//xplat/folly/portability:unistd",
+        ":async_ssl_socket_test_lib",
+        ":blocking_socket",
+        ":mocks",
+        ":test_ssl_server",
+        ":tfo_util",
+        "//xplat/folly:exception_wrapper",
+        "//xplat/folly:string",
+        "//xplat/folly/io/async:async_base",
+        "//xplat/folly/io/async:async_pipe",
+        "//xplat/folly/io/async:async_socket",
+        "//xplat/folly/io/async:async_socket_exception",
+        "//xplat/folly/io/async:async_ssl_socket",
+        "//xplat/folly/io/async:async_transport",
+        "//xplat/folly/io/async:event_base_thread",
+        "//xplat/folly/io/async:scoped_event_base_thread",
+        "//xplat/folly/io/async:ssl_context",
+        "//xplat/folly/io/async:ssl_options",
+        "//xplat/folly/io/async/ssl:basic_transport_certificate",
+        "//xplat/folly/io/async/ssl:openssl_transport_certificate",
+        "//xplat/folly/io/async/ssl:ssl_errors",
+        "//xplat/folly/net:net_ops",
+        "//xplat/folly/net:network_socket",
+        "//xplat/folly/net/test:mock_net_ops_dispatcher",
+        "//xplat/third-party/openssl:crypto",
+        "//xplat/third-party/openssl:ssl",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_ssl_socket_write_test",
+    srcs = ["AsyncSSLSocketWriteTest.cpp"],
+    oncall = "secure_pipes",
+    supports_static_listing = False,
+    deps = [
+        "//folly/io:iobuf",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:async_ssl_socket",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_socket_exception_test",
+    srcs = ["AsyncSocketExceptionTest.cpp"],
+    oncall = "secure_pipes",
+    supports_static_listing = False,
+    deps = [
+        "//folly:conv",
+        "//folly/io/async:async_socket_exception",
+        "//folly/io/async:ssl_context",
+        "//folly/io/async/ssl:ssl_errors",
+        "//folly/portability:gtest",
+        "//folly/portability:openssl",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_socket_observer_test",
+    srcs = ["AsyncSocketObserverTest.cpp"],
+    labels = ["case-isolation-failure"],
+    supports_static_listing = False,
+    deps = [
+        ":async_socket_test_lib",
+        ":mocks",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "async_socket_test_lib",
+    headers = [
+        "AsyncSocketTest.h",
+        "AsyncSocketTest2.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":blocking_socket",
+        ":callback_state_enum",
+        ":conn_callback",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:server_socket",
+        "//folly/net:net_ops",
+        "//folly/net:network_socket",
+        "//folly/portability:sockets",
+        "//folly/synchronization:rw_spin_lock",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_socket_test",
+    srcs = [
+        "AsyncSocketTest.cpp",
+        "AsyncSocketTest2.cpp",
+    ],
+    labels = ["case-isolation-failure"],
+    source_headers = ["AsyncSocketTest.h", "AsyncSocketTest2.h"],
+    supports_static_listing = False,
+    deps = [
+        "fbsource//third-party/glibc:rt",
+        ":async_socket_test_lib",  # @manual
+        ":blocking_socket",
+        ":callback_state_enum",
+        ":conn_callback",
+        ":io_uring_test_util",
+        ":mocks",
+        ":tfo_util",
+        ":util",
+        "//folly:exception_wrapper",
+        "//folly:network_address",
+        "//folly:random",
+        "//folly/io:iobuf",
+        "//folly/io:socket_option_map",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/io/async:server_socket",
+        "//folly/net:net_ops",
+        "//folly/net:network_socket",
+        "//folly/net/test:mock_net_ops_dispatcher",
+        "//folly/net/test:mock_tcpinfo_dispatcher",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/portability:sockets",
+        "//folly/portability:unistd",
+        "//folly/synchronization:baton",
+        "//folly/synchronization:rw_spin_lock",
+        "//folly/test:socket_address_test_helper",
+        "//folly/testing:test_util",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_transport_test",
+    srcs = ["AsyncTransportTest.cpp"],
+    supports_static_listing = False,
+    deps = [
+        ":mocks",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:async_transport",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "event_handler_test",
+    srcs = ["EventHandlerTest.cpp"],
+    supports_static_listing = False,
+    deps = [
+        "//folly:mpmc_queue",
+        "//folly:scope_guard",
+        "//folly/io/async:async_base",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/portability:sockets",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_timeout_test",
+    srcs = ["AsyncTimeoutTest.cpp"],
+    oncall = "thrift",
+    deps = [
+        "//folly/io/async:async_base",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_udp_socket_test",
+    srcs = ["AsyncUDPSocketTest.cpp"],
+    labels = [tpx_labels.heavyweight],
+    oncall = "thrift",
+    supports_static_listing = False,
+    deps = [
+        "//folly:conv",
+        "//folly:network_address",
+        "//folly:string",
+        "//folly/io:iobuf",
+        "//folly/io:socket_option_map",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_udp_server_socket",
+        "//folly/io/async:async_udp_socket",
+        "//folly/net/test:mock_net_ops_dispatcher",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/portability:sockets",
+        "//folly/testing:test_util",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_udp_socket_gso_gro_test",
+    srcs = ["AsyncUDPSocketGSOGROTest.cpp"],
+    oncall = "thrift",
+    deps = [
+        "//folly:conv",
+        "//folly:network_address",
+        "//folly/io:iobuf",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_udp_server_socket",
+        "//folly/io/async:async_udp_socket",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_udp_socket_sendmmsg_test",
+    srcs = ["AsyncUDPSocketSendmmsgTest.cpp"],
+    oncall = "thrift",
+    deps = [
+        "//folly:conv",
+        "//folly:network_address",
+        "//folly/io:iobuf",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_udp_server_socket",
+        "//folly/io/async:async_udp_socket",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_udp_socket_zero_copy_test",
+    srcs = ["AsyncUDPSocketZeroCopyTest.cpp"],
+    oncall = "thrift",
+    deps = [
+        "//folly:network_address",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_udp_socket",
+        "//folly/portability:gtest",
+        "//folly/portability:sockets",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "blocking_socket",
+    headers = ["BlockingSocket.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:optional",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:async_ssl_socket",
+        "//folly/io/async:ssl_context",
+        "//folly/net:network_socket",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "callback_state_enum",
+    headers = [
+        "CallbackStateEnum.h",
+    ],
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "conn_callback",
+    headers = [
+        "ConnCallback.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":callback_state_enum",
+        "//folly/io/async:async_socket",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "delayed_destruction_base_test",
+    srcs = ["DelayedDestructionBaseTest.cpp"],
+    oncall = "thrift",
+    deps = [
+        "//folly/io/async:delayed_destruction",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "delayed_destruction_test",
+    srcs = ["DelayedDestructionTest.cpp"],
+    oncall = "thrift",
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly/io/async:delayed_destruction",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "destructor_check_test",
+    srcs = ["DestructorCheckTest.cpp"],
+    oncall = "thrift",
+    deps = [
+        "//folly:memory",
+        "//folly/io/async:destructor_check",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "event_base_benchmark",
+    srcs = ["EventBaseBenchmark.cpp"],
+    headers = [],
+    allocator = "malloc",
+    deps = [
+        "//folly:benchmark",
+        "//folly/io/async:async_base",
+        "//folly/portability:gflags",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "event_base_test_lib",
+    headers = [
+        "EventBaseTestLib.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":util",
+        "//folly:math",
+        "//folly:memory",
+        "//folly:scope_guard",
+        "//folly/futures:core",
+        "//folly/io/async:async_base",
+        "//folly/portability:gmock",
+        "//folly/portability:stdlib",
+        "//folly/portability:unistd",
+        "//folly/synchronization:baton",
+        "//folly/synchronization:relaxed_atomic",
+        "//folly/system:thread_id",
+        "//folly/system:thread_name",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "event_base_test",
+    srcs = ["EventBaseTest.cpp"],
+    allocator = "malloc",
+    labels = [
+        tpx_labels.heavyweight,
+        "load-sensitive-timing-test",
+    ],
+    oncall = "thrift",
+    supports_static_listing = False,
+    deps = [
+        ":async_signal_handler_test_lib",
+        ":event_base_test_lib",
+        "//folly/init:init",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "event_base_local_test",
+    srcs = ["EventBaseLocalTest.cpp"],
+    allocator = "malloc",
+    oncall = "thrift",
+    deps = [
+        "//folly/io/async:async_base",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "event_base_thread_test",
+    srcs = ["EventBaseThreadTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/io/async:event_base_manager",
+        "//folly/io/async:event_base_thread",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+        "//folly/system:thread_name",
+    ],
+)
+
+# Skipped because it's slow
+# folly_xplat_cxx_test(
+#     name = "hhwheel_timer_slow_test",
+#     srcs = ["HHWheelTimerSlowTests.cpp"],
+#     oncall = "thrift",
+#     raw_headers = [],
+#     labels = [
+#         "extended",
+#     ],
+#     deps = [
+#         ":util",
+#         "//xplat/folly/portability:gtest",
+#         "//xplat/folly:random",
+#         "//xplat/folly/io/async:async_base",
+#     ],
+# )
+
+fb_dirsync_cpp_unittest(
+    name = "hhwheel_timer_test",
+    srcs = ["HHWheelTimerTest.cpp"],
+    labels = ["slow"],
+    oncall = "thrift",
+    deps = [
+        ":util",
+        "//folly/io/async:async_base",
+        "//folly/portability:gtest",
+        "//folly/portability:unistd",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "mocks",
+    headers = [
+        "MockAsyncSSLSocket.h",
+        "MockAsyncSocket.h",
+        "MockAsyncSocketLegacyObserver.h",
+        "MockAsyncSocketObserver.h",
+        "MockAsyncTransport.h",
+        "MockAsyncUDPSocket.h",
+        "MockTimeoutManager.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:memory",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:async_socket_exception",
+        "//folly/io/async:async_ssl_socket",
+        "//folly/io/async:async_transport",
+        "//folly/io/async:async_udp_socket",
+        "//folly/portability:gmock",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "mock_server_socket",
+    headers = ["MockAsyncServerSocket.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/io/async:async_base",
+        "//folly/io/async:server_socket",
+        "//folly/portability:gmock",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "notification_queue_test",
+    srcs = ["NotificationQueueTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/io/async:async_base",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "atomic_notification_queue_test",
+    srcs = ["AtomicNotificationQueueTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/io/async:async_base",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "notification_queue_benchmark",
+    srcs = ["NotificationQueueBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly/io/async:async_base",
+        "//folly/synchronization:baton",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "request_context_test",
+    srcs = ["RequestContextTest.cpp"],
+    headers = ["RequestContextHelper.h"],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:memory",
+        "//folly:singleton",
+        "//folly/container:enumerate",
+        "//folly/io/async:async_base",
+        "//folly/io/async:request_context",
+        "//folly/portability:gtest",
+        "//folly/synchronization:relaxed_atomic",
+        "//folly/synchronization/test:barrier",
+        "//folly/system:thread_name",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "scoped_bound_port",
+    srcs = ["ScopedBoundPort.cpp"],
+    headers = ["ScopedBoundPort.h"],
+    use_raw_headers = True,
+    deps = [
+        "//folly:memory",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/io/async:server_socket",
+    ],
+    exported_deps = [
+        "//folly:network_address",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "scoped_event_base_thread_test",
+    srcs = ["ScopedEventBaseThreadTest.cpp"],
+    deps = [
+        "//folly:optional",
+        "//folly/futures:core",
+        "//folly/io/async:event_base_manager",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+        "//folly/system:thread_name",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "socket_client",
+    srcs = ["SocketClient.cpp"],
+    headers = [],
+    deps = [
+        ":blocking_socket",
+        "//folly:exception_wrapper",
+        "//folly/portability:gflags",
+    ],
+)
+
+non_fbcode_target(
+    _kind = folly_xplat_cxx_test,
+    name = "ssl_session_test",
+    srcs = [
+        "SSLSessionTest.cpp",
+    ],
+    oncall = "secure_pipes",
+    raw_headers = [],
+    resources = {
+        "certs/ca-cert.pem": "//xplat/folly/io/async/test/certs:ca-cert.pem",
+        "certs/tests-cert.pem": "//xplat/folly/io/async/test/certs:tests-cert.pem",
+        "certs/tests-key.pem": "//xplat/folly/io/async/test/certs:tests-key.pem",
+    },
+    deps = [
+        "fbsource//xplat/folly/portability:gtest",
+        "fbsource//xplat/folly/portability:openssl",
+        "fbsource//xplat/folly/portability:sockets",
+        ":async_ssl_socket_test_lib",
+        "//xplat/folly/net:net_ops",
+        "//xplat/folly/net:network_socket",
+        "//xplat/folly/ssl:ssl_session",
+        "//xplat/folly/ssl/detail:openssl_session",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "time_util_test",
+    srcs = ["TimeUtilTest.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        ":util",
+        "//folly/portability:gtest",
+        "//folly/portability:unistd",
+    ],
+)
+
+non_fbcode_target(
+    _kind = folly_xplat_cxx_test,
+    name = "ssl_context_test",
+    srcs = [
+        "SSLContextTest.cpp",
+    ],
+    oncall = "secure_pipes",
+    raw_headers = [],
+    resources = {
+        "certs/client_chain.pem": "//xplat/folly/io/async/test/certs:client_chain.pem",
+        "certs/client_key.pem": "//xplat/folly/io/async/test/certs:client_key.pem",
+        "certs/clienti_key.pem": "//xplat/folly/io/async/test/certs:clienti_key.pem",
+        "certs/tests-cert.pem": "//xplat/folly/io/async/test/certs:tests-cert.pem",
+        "certs/tests-key.pem": "//xplat/folly/io/async/test/certs:tests-key.pem",
+    },
+    deps = [
+        "fbsource//xplat/folly/portability:gtest",
+        "fbsource//xplat/folly/portability:openssl",
+        ":ssl_util",
+        "//xplat/folly:file_util",
+        "//xplat/folly/io/async:ssl_context",
+        "//xplat/folly/ssl:openssl_cert_utils",
+        "//xplat/folly/ssl:openssl_key_utils",
+        "//xplat/folly/ssl:openssl_ptr_types",
+        "//xplat/folly/testing:test_util",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "ssl_options_test",
+    srcs = ["SSLOptionsTest.cpp"],
+    oncall = "secure_pipes",
+    deps = [
+        ":ssl_util",
+        "//folly/io/async:ssl_context",
+        "//folly/io/async:ssl_options",
+        "//folly/portability:gtest",
+        "//folly/ssl:openssl_ptr_types",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "ssl_util",
+    srcs = [
+        "SSLUtil.cpp",
+    ],
+    headers = [
+        "SSLUtil.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/ssl:openssl_ptr_types",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "util",
+    srcs = [
+        "SocketPair.cpp",
+        "TimeUtil.cpp",
+    ],
+    headers = [
+        "SocketPair.h",
+        "TimeUtil.h",
+        "UndelayedDestruction.h",
+        "Util.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:conv",
+        "//folly:portability",
+        "//folly:scope_guard",
+        "//folly:string",
+        "//folly/net:net_ops",
+        "//folly/portability:fcntl",
+        "//folly/portability:sockets",
+        "//folly/portability:unistd",
+        "//folly/system:thread_id",
+    ],
+    exported_deps = [
+        "//folly/net:network_socket",
+        "//folly/portability:gtest",
+        "//folly/portability:sys_types",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "write_chain_async_transport_wrapper_test",
+    srcs = ["WriteChainAsyncTransportWrapperTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/io/async:async_transport",
+        "//folly/io/async:decorated_async_transport_wrapper",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "write_flags_test",
+    srcs = ["WriteFlagsTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/io/async:async_transport",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "io_uring_test_util",
+    srcs = ["IoUringTestUtil.cpp"],
+    headers = ["IoUringTestUtil.h"],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        ":async_socket_test_lib",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:io_uring_setup_retry",
+    ],
+    exported_deps = [
+        "//folly/io:iobuf",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_transport",
+        "//folly/io/async:io_uring_backend",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "async_socket_provided_buffer_test",
+    srcs = ["AsyncSocketProvidedBufferTest.cpp"],
+    headers = [],
+    deps = [
+        ":io_uring_test_util",
+        "//folly/io/async:async_socket",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "zero_copy_lib",
+    srcs = ["ZeroCopy.cpp"],
+    headers = ["ZeroCopy.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:exception_wrapper",
+        "//folly:network_address",
+        "//folly/io:iobuf",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:server_socket",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "zero_copy_test",
+    srcs = ["ZeroCopyTest.cpp"],
+    headers = [],
+    deps = [
+        ":io_uring_test_util",
+        ":zero_copy_lib",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "zero_copy_benchmark",
+    srcs = ["ZeroCopyBenchmark.cpp"],
+    headers = [],
+    deps = [
+        ":zero_copy_lib",
+        "//folly:benchmark",
+        "//folly/portability:gflags",
+    ],
+)
+
+# !!!! fbcode/folly/io/async/test/TARGETS was merged into this file, see https://fburl.com/workplace/xl8l9yuo for more info !!!!
+
+fbcode_target(
+    _kind = alias_pem,
+    pems = [
+        "tests-cert.pem",
+        "tests-key.pem",
+        "ca-cert.pem",
+        "client_cert.pem",
+        "client_key.pem",
+        "client_ca_cert.pem",
+        "client_chain.pem",
+        "clienti_key.pem",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_library,
+    name = "test_ssl_server",
+    srcs = [
+        "TestSSLServer.cpp",
+    ],
+    headers = [
+        "TestSSLServer.h",
+    ],
+    resources = {
+        "certs/ca-cert.pem": ":ca-cert.pem",
+        "certs/client_ca_cert.pem": ":client_ca_cert.pem",
+        "certs/client_cert.pem": ":client_cert.pem",
+        "certs/client_chain.pem": ":client_chain.pem",
+        "certs/client_key.pem": ":client_key.pem",
+        "certs/tests-cert.pem": ":tests-cert.pem",
+        "certs/tests-key.pem": ":tests-key.pem",
+    },
+    deps = [
+        "//folly/portability:openssl",
+    ],
+    exported_deps = [
+        ":callback_state_enum",
+        "//folly:network_address",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:async_ssl_socket",
+        "//folly/io/async:async_transport",
+        "//folly/io/async:server_socket",
+        "//folly/io/async/ssl:ssl_errors",
+        "//folly/portability:gtest",
+        "//folly/portability:sockets",
+        "//folly/portability:unistd",
+        "//folly/testing:test_util",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "async_ssl_socket_test",
+    srcs = [
+        "AsyncSSLSocketTest.cpp",
+        "AsyncSSLSocketTest2.cpp",
+    ],
+    extract_helper_lib = False,
+    labels = ["oss-broken"],
+    oncall = "secure_pipes",
+    resources = {
+        "certs/ca-cert.pem": ":ca-cert.pem",
+        "certs/client_ca_cert.pem": ":client_ca_cert.pem",
+        "certs/client_cert.pem": ":client_cert.pem",
+        "certs/client_key.pem": ":client_key.pem",
+        "certs/tests-cert.pem": ":tests-cert.pem",
+        "certs/tests-key.pem": ":tests-key.pem",
+    },
+    source_headers = [
+        "AsyncSSLSocketTest.h",
+    ],
+    supports_static_listing = False,
+    deps = [
+        "fbsource//third-party/glibc:dl",
+        ":async_ssl_socket_test_lib",  # @manual
+        ":blocking_socket",
+        ":mocks",
+        ":test_ssl_server",
+        ":tfo_util",
+        "//folly:exception_wrapper",
+        "//folly:network_address",
+        "//folly:string",
+        "//folly/fibers:fiber_manager_map",
+        "//folly/futures:core",
+        "//folly/init:init",
+        "//folly/io:iobuf",
+        "//folly/io:socket_option_map",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_pipe",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:async_ssl_socket",
+        "//folly/io/async:async_transport",
+        "//folly/io/async:event_base_thread",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/io/async:server_socket",
+        "//folly/io/async:ssl_context",
+        "//folly/io/async:ssl_options",
+        "//folly/io/async/ssl:basic_transport_certificate",
+        "//folly/io/async/ssl:openssl_transport_certificate",
+        "//folly/io/async/ssl:ssl_errors",
+        "//folly/net:net_ops",
+        "//folly/net:network_socket",
+        "//folly/net/test:mock_net_ops_dispatcher",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/portability:openssl",
+        "//folly/portability:pthread",
+        "//folly/portability:sockets",
+        "//folly/portability:string",
+        "//folly/portability:unistd",
+        "//folly/testing:test_util",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "decorated_async_transport_wrapper_test",
+    srcs = ["DecoratedAsyncTransportWrapperTest.cpp"],
+    deps = [
+        "//folly/io/async:async_socket",
+        "//folly/io/async:async_transport",
+        "//folly/io/async:decorated_async_transport_wrapper",
+        "//folly/portability:gtest",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "hhwheel_timer_slow_test",
+    srcs = ["HHWheelTimerSlowTests.cpp"],
+    headers = [],
+    labels = [
+        tpx_labels.extended,
+        "load-sensitive-timing-test",
+    ],
+    oncall = "thrift",
+    deps = [
+        ":util",
+        "//folly:random",
+        "//folly/io/async:async_base",
+        "//folly/portability:gtest",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_benchmark,
+    name = "request_context_benchmark",
+    srcs = ["RequestContextBenchmark.cpp"],
+    headers = ["RequestContextHelper.h"],
+    deps = [
+        "//folly:conv",
+        "//folly/container:array",
+        "//folly/io/async:request_context",
+        "//folly/portability:gflags",
+        "//folly/synchronization:relaxed_atomic",
+        "//folly/synchronization/test:barrier",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "terminate_cancellation_token_test",
+    srcs = ["TerminateCancellationTokenTest.cpp"],
+    deps = [
+        "//folly/io/async:terminate_cancellation_token",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "ssl_session_test",
+    srcs = ["SSLSessionTest.cpp"],
+    headers = [],
+    oncall = "secure_pipes",
+    resources = {
+        "certs/ca-cert.pem": ":ca-cert.pem",
+        "certs/tests-cert.pem": ":tests-cert.pem",
+        "certs/tests-key.pem": ":tests-key.pem",
+    },
+    deps = [
+        ":async_ssl_socket_test_lib",
+        "//folly/net:net_ops",
+        "//folly/net:network_socket",
+        "//folly/portability:gtest",
+        "//folly/portability:openssl",
+        "//folly/portability:sockets",
+        "//folly/ssl:ssl_session",
+        "//folly/ssl/detail:openssl_session",
+        "//folly/testing:test_util",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "ssl_context_test",
+    srcs = ["SSLContextTest.cpp"],
+    headers = [],
+    oncall = "secure_pipes",
+    resources = {
+        "certs/client_chain.pem": ":client_chain.pem",
+        "certs/client_key.pem": ":client_key.pem",
+        "certs/clienti_key.pem": ":clienti_key.pem",
+        "certs/tests-cert.pem": ":tests-cert.pem",
+        "certs/tests-key.pem": ":tests-key.pem",
+    },
+    deps = [
+        ":ssl_util",
+        "//folly:file_util",
+        "//folly/io/async:ssl_context",
+        "//folly/portability:gtest",
+        "//folly/portability:openssl",
+        "//folly/ssl:openssl_cert_utils",
+        "//folly/ssl:openssl_key_utils",
+        "//folly/ssl:openssl_ptr_types",
+        "//folly/testing:test_util",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "ssl_context_regression_test",
+    srcs = ["SSLContextRegressionTest.cpp"],
+    headers = [],
+    oncall = "secure_pipes",
+    deps = [
+        "//folly:file_util",
+        "//folly/io/async:ssl_context",
+        "//folly/portability:gtest",
+        "//folly/testing:test_util",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "timerfd_timeout_manager_test",
+    srcs = ["TimerFDTimeoutManagerTest.cpp"],
+    headers = [],
+    labels = ["load-sensitive-timing-test"],
+    deps = [
+        "//folly/io/async:timerfd",
+        "//folly/io/async/test:util",
+        "//folly/portability:gtest",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "hhwheel_timer_high_res_test",
+    srcs = ["HHWheelTimerHighResTest.cpp"],
+    headers = [],
+    labels = ["load-sensitive-timing-test"],
+    deps = [
+        "//folly/io/async:async_base",
+        "//folly/io/async:timerfd",
+        "//folly/io/async/test:util",
+        "//folly/portability:gtest",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_binary,
+    name = "hhwheel_timer_high_res_benchmark",
+    srcs = ["HHWheelTimerHighResBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly/io/async:timerfd",
+        "//folly/io/async/test:util",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "async_io_test",
+    srcs = ["AsyncIOTest.cpp"],
+    supports_static_listing = False,
+    deps = [
+        "//folly/io/async:async_io",
+        "//folly/io/async/test:async_base_test_lib",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "async_io_uring_socket_test",
+    srcs = ["AsyncIoUringSocketTest.cpp"],
+    labels = [tpx_labels.heavyweight],
+    supports_static_listing = False,
+    deps = [
+        ":async_socket_test_lib",
+        "//folly:file_util",
+        "//folly:subprocess",
+        "//folly/executors:global_executor",
+        "//folly/futures:core",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_io_uring_socket",
+        "//folly/io/async:async_socket",
+        "//folly/io/async:io_uring_backend",
+        "//folly/io/async:io_uring_event",
+        "//folly/io/async:server_socket",
+        "//folly/portability:gtest",
+        "//folly/portability:sockets",
+        "//folly/portability:unistd",
+        "//folly/system:shell",
+        "//folly/test:socket_address_test_helper",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "epoll_backend_test",
+    srcs = ["EpollBackendTest.cpp"],
+    labels = [
+        tpx_labels.heavyweight,
+        "load-sensitive-timing-test",
+    ],
+    owner = "dmm@xmail.facebook.com",
+    supports_static_listing = False,
+    deps = [
+        "//folly/io/async:epoll_backend",
+        "//folly/io/async/test:async_signal_handler_test_lib",
+        "//folly/io/async/test:event_base_test_lib",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "poll_loop_hooks_test",
+    srcs = ["PollLoopHooksTest.cpp"],
+    owner = "dmm@xmail.facebook.com",
+    deps = [
+        "//folly/io/async:async_base",
+        "//folly/io/async:epoll_backend",
+        "//folly/portability:gtest",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_binary,
+    name = "io_benchmark",
+    srcs = ["IOBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly:file_util",
+        "//folly/io/async:async_io",
+        "//folly/io/async:io_uring",
+        "//folly/io/async/test:async_base_test_lib",
+        "//folly/io/async/test:io_test_temp_file_util_lib",
+        "//folly/portability:gflags",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_binary,
+    name = "io_uring_backend_bench",
+    srcs = ["IoUringBackendBench.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly:file_util",
+        "//folly/init:init",
+        "//folly/io/async:async_base",
+        "//folly/io/async:epoll_backend",
+        "//folly/io/async:io_uring_backend",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/portability:gflags",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_binary,
+    name = "io_uring_provided_buffer_ring_benchmark",
+    srcs = ["IoUringProvidedBufferRingBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly/init:init",
+        "//folly/io/async:io_uring_provided_buffer_ring",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "io_uring_backend_setup_test",
+    srcs = ["IoUringBackendSetupTest.cpp"],
+    owner = "kvigor@xmail.facebook.com",
+    deps = [
+        "//folly/io/async:async_base",
+        "//folly/io/async:io_uring_backend",
+        "//folly/io/async:io_uring_buffer_pool_sharing",
+        "//folly/portability:gtest",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "io_uring_backend_test",
+    srcs = ["IoUringBackendTest.cpp"],
+    headers = [],
+    labels = [
+        tpx_labels.heavyweight,
+        "load-sensitive-timing-test",
+        "slow",
+    ],
+    owner = "dmm@xmail.facebook.com",
+    supports_static_listing = False,
+    deps = [
+        "//folly:file_util",
+        "//folly:function",
+        "//folly:string",
+        "//folly/init:init",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_udp_server_socket",
+        "//folly/io/async:async_udp_socket",
+        "//folly/io/async:io_uring_backend",
+        "//folly/io/async:io_uring_provided_buffer_ring",
+        "//folly/io/async/test:async_signal_handler_test_lib",
+        "//folly/io/async/test:event_base_test_lib",
+        "//folly/io/async/test:io_test_temp_file_util_lib",
+        "//folly/portability:gtest",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "io_uring_event_base_local_test",
+    srcs = ["IoUringEventBaseLocalTest.cpp"],
+    owner = "dylany@xmail.facebook.com",
+    deps = [
+        "//folly/futures:core",
+        "//folly/io/async:io_uring_backend",
+        "//folly/io/async:io_uring_event_base_local",
+        "//folly/portability:gtest",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "io_uring_event_test",
+    srcs = ["IoUringEventTest.cpp"],
+    owner = "dylany@xmail.facebook.com",
+    supports_static_listing = False,
+    deps = [
+        "//folly/futures:core",
+        "//folly/io/async:async_base",
+        "//folly/io/async:io_uring_backend",
+        "//folly/io/async:io_uring_event",
+        "//folly/portability:gtest",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "io_uring_test",
+    srcs = ["IoUringTest.cpp"],
+    labels = ["oss-broken"],
+    owner = "dmm@xmail.facebook.com",
+    supports_static_listing = False,
+    deps = [
+        "//folly/init:init",
+        "//folly/io/async:io_uring",
+        "//folly/io/async/test:async_base_test_lib",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "io_uring_zero_copy_buffer_pool_test",
+    srcs = ["IoUringZeroCopyBufferPoolTest.cpp"],
+    supports_static_listing = False,
+    deps = [
+        "//folly/io/async:io_uring_zero_copy_buffer_pool",
+        "//folly/portability:unistd",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "io_uring_provided_buffer_ring_test",
+    srcs = ["IoUringProvidedBufferRingTest.cpp"],
+    deps = [
+        "//folly/io/async:io_uring_provided_buffer_ring",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "io_uring_provided_buffer_ring_max_capacity_test",
+    srcs = ["IoUringProvidedBufferRingMaxCapacityTest.cpp"],
+    labels = [
+        tpx_labels.heavyweight8,
+        tpx_labels.serialize_test_cases,
+    ],
+    deps = [
+        "//folly/io/async:io_uring_provided_buffer_ring",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "io_uring_dynamic_provided_buffer_ring_test",
+    srcs = ["IoUringDynamicProvidedBufferRingTest.cpp"],
+    deps = [
+        "//folly/io/async:io_uring_dynamic_provided_buffer_ring",
+        "//folly/io/async:io_uring_setup_retry",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "io_uring_dynamic_provided_buffer_ring_max_capacity_test",
+    srcs = ["IoUringDynamicProvidedBufferRingMaxCapacityTest.cpp"],
+    deps = [
+        "//folly/io/async:io_uring_dynamic_provided_buffer_ring",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_binary,
+    name = "registered_fd_benchmark",
+    srcs = ["RegisteredFdBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly:file_util",
+        "//folly/io/async:async_base",
+        "//folly/io/async:io_uring_backend",
+        "//folly/portability:gflags",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "simple_async_io_test",
+    srcs = ["SimpleAsyncIOTest.cpp"],
+    supports_static_listing = False,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:file",
+        "//folly:random",
+        "//folly/coro:blocking_wait",
+        "//folly/coro:collect",
+        "//folly/executors:inline_executor",
+        "//folly/io:iobuf",
+        "//folly/io/async:async_base",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/io/async:simple_async_io",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_library,
+    name = "io_test_temp_file_util_lib",
+    srcs = ["IoTestTempFileUtil.cpp"],
+    headers = ["IoTestTempFileUtil.h"],
+    deps = [
+        "//folly:file_util",
+        "//folly:string",
+    ],
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly/io:fs_util",
+        "//folly/testing:test_util",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_library,
+    name = "async_base_test_lib",
+    srcs = ["AsyncBaseTestLib.cpp"],
+    headers = ["AsyncBaseTestLib.h"],
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:scope_guard",
+        "//folly:string",
+        "//folly/io:fs_util",
+        "//folly/io/async:async_base_class",
+        "//folly/io/async/test:io_test_temp_file_util_lib",
+        "//folly/portability:gtest",
+        "//folly/portability:sockets",
+        "//folly/portability:unistd",
+        "//folly/test:test_utils",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_library,
+    name = "mux_io_thread_pool_executor_test_lib",
+    srcs = ["MuxIOThreadPoolExecutorTest.cpp"],
+    link_whole = True,
+    deps = [
+        "//folly:function",
+        "//folly/executors/test:IOThreadPoolExecutorBaseTestLib",
+        "//folly/io/async:epoll",
+        "//folly/io/async:mux_io_thread_pool_executor",
+        "//folly/portability:gtest",
+        "//folly/synchronization:latch",
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "mux_io_thread_pool_executor_test_epoll",
+    args = [
+        "--folly_mux_io_thread_pool_executor_poller_backend=epoll",
+        "--folly_mux_io_thread_pool_executor_poller_epoll_rearm_inline=false",
+    ],
+    supports_static_listing = False,
+    deps = [
+        ":mux_io_thread_pool_executor_test_lib",  # @manual
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "mux_io_thread_pool_executor_test_epoll_rearm_inline",
+    args = [
+        "--folly_mux_io_thread_pool_executor_poller_backend=epoll",
+        "--folly_mux_io_thread_pool_executor_poller_epoll_rearm_inline=true",
+    ],
+    supports_static_listing = False,
+    deps = [
+        ":mux_io_thread_pool_executor_test_lib",  # @manual
+    ],
+)
+
+fbcode_target(
+    _kind = cpp_unittest,
+    name = "mux_io_thread_pool_executor_test_io_uring",
+    args = [
+        "--folly_mux_io_thread_pool_executor_poller_backend=io_uring",
+    ],
+    supports_static_listing = False,
+    deps = [
+        ":mux_io_thread_pool_executor_test_lib",  # @manual
+    ],
+)

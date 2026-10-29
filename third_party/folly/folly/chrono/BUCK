@@ -1,0 +1,34 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "clock",
+    headers = ["Clock.h"],
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "conv",
+    headers = ["Conv.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:constexpr_math",
+        "//folly:conv",
+        "//folly:expected",
+        "//folly:utility",
+        "//folly/portability:sys_time",
+        "//folly/portability:sys_types",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "hardware",
+    headers = ["Hardware.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:portability",
+    ],
+)
+
+# !!!! fbcode/folly/chrono/TARGETS was merged into this file, see https://fburl.com/workplace/xl8l9yuo for more info !!!!

@@ -1,0 +1,107 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "observable",
+    headers = [
+        "Observable.h",
+        "Observable-inl.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":observer",
+        "//folly:function",
+        "//folly/synchronization:baton",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "with_jitter",
+    headers = [
+        "WithJitter.h",
+        "WithJitter-inl.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/fmt:fmt",
+        "fbsource//third-party/glog:glog",
+        "//folly:default_keep_alive_executor",
+        "//folly:random",
+        "//folly:synchronized",
+        "//folly/executors:global_executor",
+        "//folly/futures:core",
+        "//folly/observer:observable",
+        "//folly/observer:observer",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "observer",
+    headers = [
+        "Observer.h",
+        "Observer-inl.h",
+        "Observer-pre.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:shared_mutex",
+        "//folly:synchronized",
+        "//folly:thread_local",
+        "//folly/functional:invoke",
+        "//folly/observer/detail:observer_manager",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "simple_observable",
+    headers = [
+        "SimpleObservable.h",
+        "SimpleObservable-inl.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:function",
+        "//folly:synchronized",
+        "//folly/observer:observable",
+        "//folly/observer:observer",
+        "//folly/synchronization:delayed_init",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "hazptr_observer",
+    headers = [
+        "HazptrObserver.h",
+    ],
+    exported_deps = [
+        "//folly:synchronized",
+        "//folly/observer:observer",
+        "//folly/observer/detail:observer_manager",
+        "//folly/synchronization:hazptr",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "read_mostly_tl_observer",
+    headers = [
+        "ReadMostlyTLObserver.h",
+    ],
+    exported_deps = [
+        "//folly/concurrency/memory:read_mostly_shared_ptr",
+        "//folly/observer:observer",
+        "//folly/observer/detail:observer_manager",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "core_cached_observer",
+    headers = [
+        "CoreCachedObserver.h",
+    ],
+    exported_deps = [
+        "//folly/concurrency:core_cached_shared_ptr",
+        "//folly/observer:observer",
+        "//folly/observer/detail:observer_manager",
+    ],
+)

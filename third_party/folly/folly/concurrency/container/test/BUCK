@@ -1,0 +1,67 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "atomic_grow_array_test",
+    srcs = ["atomic_grow_array_test.cpp"],
+    deps = [
+        "//folly/concurrency/container:atomic_grow_array",
+        "//folly/lang:keep",
+        "//folly/portability:gtest",
+        "//folly/test:deterministic_schedule",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "relaxed_concurrent_priority_queue_test",
+    srcs = ["RelaxedConcurrentPriorityQueueTest.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/boost:boost_thread",  # @manual
+        "fbsource//third-party/glog:glog",
+        "//folly:random",
+        "//folly:spin_lock",
+        "//folly/concurrency/container:flat_combining_priority_queue",
+        "//folly/concurrency/container:relaxed_concurrent_priority_queue",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+        "//folly/synchronization:atomic_notification",
+        "//folly/test:deterministic_schedule",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "lock_free_ring_buffer_test",
+    srcs = ["LockFreeRingBufferTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/concurrency/container:lock_free_ring_buffer",
+        "//folly/portability:gtest",
+        "//folly/test:deterministic_schedule",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "flat_combining_priority_queue_test",
+    srcs = ["FlatCombiningPriorityQueueTest.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:benchmark",
+        "//folly/concurrency/container:flat_combining_priority_queue",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "single_writer_fixed_hash_map_test",
+    srcs = ["SingleWriterFixedHashMapTest.cpp"],
+    deps = [
+        "//folly:benchmark",
+        "//folly/concurrency/container:single_writer_fixed_hash_map",
+        "//folly/container:array",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+        "//folly/synchronization/test:barrier",
+    ],
+)

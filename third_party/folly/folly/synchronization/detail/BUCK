@@ -1,0 +1,77 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "atomic_utils",
+    headers = ["AtomicUtils.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/lang:assume",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "hazptr_utils",
+    headers = [
+        "HazptrUtils.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        ":sleeper",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "inline_function_ref",
+    headers = [
+        "InlineFunctionRef.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:function",
+        "//folly:traits",
+        "//folly:utility",
+        "//folly/functional:invoke",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "rcu-detail",
+    headers = [
+        "ThreadCachedLists.h",
+        "ThreadCachedReaders.h",
+        "ThreadCachedTag.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:function",
+        "//folly:synchronized",
+        "//folly:thread_local",
+        "//folly/synchronization:asymmetric_thread_fence",
+        "//folly/synchronization:relaxed_atomic",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "sleeper",
+    srcs = ["Sleeper.cpp"],
+    headers = ["Sleeper.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/portability:asm",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "spin",
+    headers = ["Spin.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/portability:asm",
+        "//folly/synchronization:wait_options",
+    ],
+)

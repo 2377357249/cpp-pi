@@ -1,0 +1,34 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rust_library.bzl", "fb_dirsync_rust_library")
+
+oncall("rust_libraries")
+
+fb_dirsync_cpp_library(
+    name = "network_address-ffi",
+    srcs = ["FollyWrapper.cpp"],
+    headers = ["FollyWrapper.h"],
+    preferred_linkage = "static",
+    undefined_symbols = True,  # defined by :network_address
+    visibility = ["PUBLIC"],
+    deps = [
+        ":network_address@header",
+    ],
+    exported_deps = [
+        "fbsource//third-party/rust:cxx-core",
+        "//folly:network_address",
+    ],
+)
+
+fb_dirsync_rust_library(
+    name = "network_address",
+    srcs = ["src/lib.rs"],
+    cpp_deps = [
+        ":network_address-ffi",
+    ],
+    crate = "network_address",
+    crate_root = "src/lib.rs",
+    cxx_bridge = "src/lib.rs",
+    deps = [
+        "fbsource//third-party/rust:cxx",
+    ],
+)

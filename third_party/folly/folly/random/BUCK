@@ -1,0 +1,56 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+# xplat build rules
+
+fb_dirsync_cpp_library(
+    name = "hash",
+    headers = [
+        "hash.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:utility",
+        "//folly/functional:invoke",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "seed_seq",
+    headers = [
+        "seed_seq.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:traits",
+        "//folly/functional:invoke",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "splitmix64",
+    headers = [
+        "splitmix64.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":seed_seq",
+        "//folly/functional:invoke",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "xoshiro256pp",
+    headers = [
+        "xoshiro256pp.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":seed_seq",
+        ":splitmix64",
+        "//folly:likely",
+        "//folly:portability",
+        "//folly/functional:invoke",
+    ],
+)

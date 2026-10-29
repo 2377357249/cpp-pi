@@ -1,0 +1,370 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "coded_rich_error_test",
+    srcs = ["coded_rich_error_test.cpp"],
+    deps = [
+        ":common",
+        ":rich_error_codes",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/result:coded_rich_error",
+        "//folly/result:immortal_rich_error",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "common",
+    headers = ["common.h"],
+    exported_deps = [
+        "//folly:demangle",
+        "//folly:unit",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/result:result",
+        "//folly/result:rich_error_base",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "epitaph_bench",
+    srcs = ["epitaph_bench.cpp"],
+    headers = ["benchmark_common.h"],
+    deps = [
+        ":common",
+        "//folly:benchmark",
+        "//folly/result:epitaph",
+        "//folly/result:immortal_rich_error",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "epitaph_test",
+    srcs = ["epitaph_test.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        ":common",
+        ":rich_error_codes",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/result:coded_rich_error",
+        "//folly/result:epitaph",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "errc_rich_error_test",
+    srcs = ["errc_rich_error_test.cpp"],
+    deps = [
+        ":common",
+        ":rich_error_codes",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/result:errc_rich_error",
+        "//folly/result:immortal_rich_error",
+        "//folly/result:rich_error_code",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "immortal_rich_error_test",
+    srcs = ["immortal_rich_error_test.cpp"],
+    deps = [
+        ":common",
+        "//folly/portability:gtest",
+        "//folly/result:epitaph",
+        "//folly/result:immortal_rich_error",
+        "//folly/result:rich_error",
+        "//folly/result:rich_msg",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "nestable_coded_rich_error_test",
+    srcs = ["nestable_coded_rich_error_test.cpp"],
+    deps = [
+        ":common",
+        ":rich_error_codes",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/result:nestable_coded_rich_error",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "or_unwind_epitaph_test",
+    srcs = ["or_unwind_epitaph_test.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/result:gtest_helpers",
+        "//folly/result:or_unwind_epitaph",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "or_unwind_test",
+    srcs = ["or_unwind_test.cpp"],
+    deps = [
+        "//folly:utility",
+        "//folly/coro:async_generator",
+        "//folly/coro:blocking_wait",
+        "//folly/coro:value_or_error",
+        "//folly/coro/safe:now_task",
+        "//folly/lang:must_use_immediately",
+        "//folly/lang:rvalue_reference_wrapper",
+        "//folly/portability:gtest",
+        "//folly/result:coro",
+        "//folly/result:value_only_result",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "result_bench",
+    srcs = ["result_bench.cpp"],
+    headers = ["benchmark_common.h"],
+    deps = [
+        ":common",
+        "//folly:benchmark",
+        "//folly:exception_wrapper",
+        "//folly:portability",
+        "//folly/result:result",
+        "//folly/result:try",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "result_coro_bench",
+    srcs = ["result_coro_bench.cpp"],
+    headers = ["benchmark_common.h"],
+    deps = [
+        ":common",
+        "//folly:benchmark",
+        "//folly:portability",
+        "//folly:scope_guard",
+        "//folly/lang:keep",
+        "//folly/result:coro",  # @manual
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "result_test",
+    srcs = ["result_test.cpp"],
+    deps = [
+        ":common",
+        "//folly/coro:gtest_helpers",
+        "//folly/coro:traits",
+        "//folly/coro/safe:now_task",
+        "//folly/result:gtest_helpers",
+        "//folly/result:or_unwind_epitaph",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_error_code_bench",
+    srcs = ["rich_error_code_bench.cpp"],
+    headers = ["benchmark_common.h"],
+    deps = [
+        ":common",
+        ":rich_error_codes",
+        "//folly:benchmark",
+        "//folly/result:immortal_rich_error",
+        "//folly/result:rich_error",
+        "//folly/result:rich_error_code",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_error_code_test",
+    srcs = ["rich_error_code_test.cpp"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        ":common",
+        ":rich_error_codes",
+        "//folly:traits",
+        "//folly:utility",
+        "//folly/portability:gtest",
+        "//folly/result:immortal_rich_error",
+        "//folly/result:rich_error",
+        "//folly/result:rich_error_code",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "rich_error_codes",
+    headers = ["rich_error_codes.h"],
+    exported_deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:traits",
+        "//folly/result:rich_error",
+        "//folly/result:rich_error_code",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_error_test",
+    srcs = ["rich_error_test.cpp"],
+    deps = [
+        ":common",
+        ":rich_error_codes",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/result:epitaph",
+        "//folly/result:rich_error",
+        "//folly/result:rich_error_base",
+        "//folly/result:rich_error_code",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_exception_ptr_bench",
+    srcs = ["rich_exception_ptr_bench.cpp"],
+    headers = ["benchmark_common.h"],
+    deps = [
+        ":common",
+        "//folly:benchmark",
+        "//folly:exception_wrapper",
+        "//folly/result:immortal_rich_error",
+        "//folly/result:rich_error",
+        "//folly/result:rich_error_base",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_exception_ptr_fmt_bench",
+    srcs = ["rich_exception_ptr_fmt_bench.cpp"],
+    headers = ["benchmark_common.h"],
+    deps = [
+        ":common",
+        "//folly:benchmark",
+        "//folly/result:epitaph",
+        "//folly/result:immortal_rich_error",
+        "//folly/result:rich_error",
+        "//folly/result:rich_error_base",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "rich_exception_ptr_check_get",
+    headers = ["rich_exception_ptr_check_get.h"],
+    exported_deps = [
+        ":rich_exception_ptr_common",
+        "//folly/result:epitaph",
+        "//folly/result:rich_error",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "rich_exception_ptr_common",
+    headers = ["rich_exception_ptr_common.h"],
+    exported_deps = [
+        "//folly/portability:gtest",
+        "//folly/result:rich_error_base",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_exception_ptr_constexpr_test",
+    srcs = ["rich_exception_ptr_constexpr.cpp"],
+    deps = [
+        ":rich_exception_ptr_common",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_exception_ptr_fundamentals_test",
+    srcs = ["rich_exception_ptr_fundamentals_test.cpp"],
+    deps = [
+        ":rich_exception_ptr_common",
+        "//folly/portability:gtest",
+        "//folly/result:epitaph",
+        "//folly/result:immortal_rich_error",
+        "//folly/result:rich_error",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_exception_ptr_immortal_test",
+    srcs = ["rich_exception_ptr_immortal_test.cpp"],
+    deps = [
+        ":rich_exception_ptr_check_get",
+        "//folly/portability:gtest",
+        "//folly/result:immortal_rich_error",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_exception_ptr_misc_test",
+    srcs = ["rich_exception_ptr_misc_test.cpp"],
+    deps = [
+        ":rich_exception_ptr_check_get",
+        "//folly:operation_cancelled",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_exception_ptr_owned_test",
+    srcs = ["rich_exception_ptr_owned_test.cpp"],
+    deps = [
+        ":rich_exception_ptr_check_get",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_exception_ptr_fmt_test",
+    srcs = ["rich_exception_ptr_fmt_test.cpp"],
+    deps = [
+        ":common",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/result:epitaph",
+        "//folly/result:immortal_rich_error",
+        "//folly/result:rich_error",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rich_msg_test",
+    srcs = ["rich_msg_test.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/result:rich_msg",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "stack_epitaph_test",
+    srcs = ["stack_epitaph_test.cpp"],
+    headers = ["benchmark_common.h"],
+    deps = [
+        ":common",
+        "//folly:benchmark",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/result:coro",
+        "//folly/result:epitaph",
+        "//folly/result:gtest_helpers",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "try_test",
+    srcs = ["try_test.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/result:try",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "value_only_result_test",
+    srcs = ["value_only_result_test.cpp"],
+    deps = [
+        "//folly/result:gtest_helpers",
+        "//folly/result:value_only_result",
+    ],
+)

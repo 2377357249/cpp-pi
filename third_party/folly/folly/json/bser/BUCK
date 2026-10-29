@@ -1,0 +1,32 @@
+load(
+    "@fbsource//tools/build_defs:platform_defs.bzl",
+    "APPLE",
+    "CXX",
+    "FBCODE",
+    "MACOSX",
+    "WINDOWS",
+)
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "bser",
+    srcs = [
+        "Dump.cpp",
+        "Load.cpp",
+    ],
+    headers = [
+        "Bser.h",
+    ],
+    apple_sdks = (MACOSX,),
+    platforms = (CXX, FBCODE, WINDOWS, APPLE),
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:c_portability",
+        "//folly:json",  # @manual
+        "//folly:optional",
+        "//folly/io:iobuf",
+        "//folly/json:dynamic",
+    ],
+)

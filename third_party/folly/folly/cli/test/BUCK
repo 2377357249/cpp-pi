@@ -1,0 +1,85 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "nested_command_line_app_test",
+    srcs = ["NestedCommandLineAppTest.cpp"],
+    env = {
+        "FOLLY_NESTED_CMDLINE_HELPER": "$(exe_target :nested_command_line_app_test_helper)",
+    },
+    resources = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:subprocess",
+        "//folly/cli:program_options",
+        "//folly/io:fs_util",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "nested_command_line_app_test_helper",
+    srcs = ["NestedCommandLineAppTestHelper.cpp"],
+    deps = [
+        # boost_atomic is required by boost_filesystem, which is required by
+        # boost_program_options, prior to C++20, for its implementation of
+        # atomic_ref; this is controlled by a preprocessory symbol
+        "fbsource//third-party/boost:boost_atomic",  # @manual
+        "//folly/cli:program_options",
+        "//folly/portability:gflags",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "program_options_test",
+    srcs = ["ProgramOptionsTest.cpp"],
+    env = {
+        "FOLLY_PROGRAM_OPTIONS_TEST_HELPER": "$(exe_target :program_options_test_helper)",
+    },
+    deps = [
+        "//folly:file_util",
+        "//folly:subprocess",
+        "//folly/cli:program_options",
+        "//folly/io:fs_util",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "program_options_test_helper",
+    srcs = ["ProgramOptionsTestHelper.cpp"],
+    deps = [
+        # boost_atomic is required by boost_filesystem, which is required by
+        # boost_program_options, prior to C++20, for its implementation of
+        # atomic_ref; this is controlled by a preprocessory symbol
+        "fbsource//third-party/boost:boost_atomic",  # @manual
+        "fbsource//third-party/glog:glog",
+        "//folly:conv",
+        "//folly/cli:program_options",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "args_test",
+    srcs = ["ArgsTest.cpp"],
+    deps = [
+        "//folly:string",
+        "//folly/cli:args",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/testing:test_util",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "nested_command_line_app_example",
+    srcs = ["NestedCommandLineAppExample.cpp"],
+    deps = [
+        "//folly:scope_guard",
+        "//folly:string",
+        "//folly/cli:program_options",
+    ],
+)

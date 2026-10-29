@@ -1,0 +1,37 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_benchmark.bzl", "fb_dirsync_cpp_benchmark")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "observer_test",
+    srcs = ["ObserverTest.cpp"],
+    labels = ["oss-broken"],
+    deps = [
+        "//folly:demangle",
+        "//folly:singleton",
+        "//folly/fibers:core_manager",
+        "//folly/fibers:fiber_manager_map",
+        "//folly/observer:core_cached_observer",
+        "//folly/observer:hazptr_observer",
+        "//folly/observer:observer",
+        "//folly/observer:read_mostly_tl_observer",
+        "//folly/observer:simple_observable",
+        "//folly/observer:with_jitter",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/synchronization:asymmetric_thread_fence",
+        "//folly/synchronization:atomic_util",
+        "//folly/synchronization:baton",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "observer_benchmark",
+    srcs = ["ObserverBenchmark.cpp"],
+    deps = [
+        "//folly:benchmark",
+        "//folly/init:init",
+        "//folly/observer:observer",
+    ],
+)

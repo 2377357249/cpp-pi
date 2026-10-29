@@ -1,0 +1,14 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_binary(
+    name = "segv",
+    srcs = ["segv.cpp"],
+    headers = [],
+    deps = [
+        "//folly/debugging/symbolizer:signal_handler",
+        "//folly/portability:sys_mman",
+        "//folly/portability:unistd",
+    ],
+)

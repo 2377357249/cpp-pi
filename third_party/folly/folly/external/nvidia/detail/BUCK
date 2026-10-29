@@ -1,0 +1,16 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "range_sve2",
+    srcs = ["RangeSve2.cpp"],
+    headers = ["RangeSve2.h"],
+    use_raw_headers = True,
+    deps = [
+        "//folly:portability",
+    ],
+    exported_deps = [
+        "//folly/detail:range_common",
+    ],
+)

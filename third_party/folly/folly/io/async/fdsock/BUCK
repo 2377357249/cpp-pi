@@ -1,0 +1,33 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+### this line is a hint for source control merge
+
+fb_dirsync_cpp_library(
+    name = "async_fd_socket",
+    srcs = ["AsyncFdSocket.cpp"],
+    headers = ["AsyncFdSocket.h"],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+    ],
+    exported_deps = [
+        ":socket_fds",
+        "//folly/io/async:async_socket",
+        "//folly/portability:gtest_prod",
+    ],
+)
+
+### this line is a hint for source control merge
+
+fb_dirsync_cpp_library(
+    name = "socket_fds",
+    srcs = ["SocketFds.cpp"],
+    headers = ["SocketFds.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:file",
+    ],
+)

@@ -1,0 +1,17 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "openssl_session",
+    srcs = ["OpenSSLSession.cpp"],
+    headers = ["OpenSSLSession.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:shared_mutex",
+        "//folly:synchronized",
+        "//folly/portability:openssl",
+        "//folly/ssl:openssl_ptr_types",
+        "//folly/ssl:ssl_session",
+    ],
+)

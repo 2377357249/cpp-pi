@@ -1,0 +1,330 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_benchmark.bzl", "fb_dirsync_cpp_benchmark")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "align_test",
+    srcs = ["AlignTest.cpp"],
+    deps = [
+        "//folly/lang:align",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "aligned_test",
+    srcs = ["AlignedTest.cpp"],
+    deps = [
+        "//folly/lang:align",
+        "//folly/lang:aligned",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "bits_benchmark",
+    srcs = ["BitsBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly:random",
+        "//folly/lang:assume",
+        "//folly/lang:bits",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "bits_test",
+    srcs = ["BitsTest.cpp"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:random",
+        "//folly/lang:bits",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "c_string_test",
+    srcs = ["CStringTest.cpp"],
+    deps = [
+        "//folly/lang:c_string",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "cast_test",
+    srcs = ["CastTest.cpp"],
+    deps = [
+        "//folly:utility",
+        "//folly/lang:cast",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "checked_math_test",
+    srcs = ["CheckedMathTest.cpp"],
+    deps = [
+        "//folly/lang:checked_math",
+        "//folly/lang:keep",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "exception_bench",
+    srcs = ["ExceptionBench.cpp"],
+    deps = [
+        "//folly:benchmark",
+        "//folly/lang:exception",
+        "//folly/lang:keep",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "exception_test",
+    srcs = ["ExceptionTest.cpp"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:portability",
+        "//folly/lang:align",
+        "//folly/lang:exception",
+        "//folly/lang:keep",
+        "//folly/lang:pretty",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "extern_test",
+    srcs = ["ExternTest.cpp"],
+    deps = [
+        "//folly/lang:extern",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "hint_test",
+    srcs = ["HintTest.cpp"],
+    deps = [
+        "//folly/lang:hint",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "must_use_immediately_test",
+    srcs = ["MustUseImmediatelyTest.cpp"],
+    deps = [
+        "//folly:traits",
+        "//folly/lang:must_use_immediately",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "new_test",
+    srcs = ["NewTest.cpp"],
+    deps = [
+        "//folly/lang:align",
+        "//folly/lang:new",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "ordering_test",
+    srcs = ["OrderingTest.cpp"],
+    deps = [
+        "//folly/lang:ordering",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "pretty_test",
+    srcs = ["PrettyTest.cpp"],
+    deps = [
+        "//folly/lang:pretty",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "propagate_const_test",
+    srcs = ["PropagateConstTest.cpp"],
+    deps = [
+        "//folly/lang:propagate_const",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rvalue_reference_wrapper_test",
+    srcs = ["RValueReferenceWrapperTest.cpp"],
+    deps = [
+        "//folly/lang:rvalue_reference_wrapper",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "safe_alias_test",
+    srcs = ["SafeAliasTest.cpp"],
+    deps = [
+        "//folly/detail:tuple",
+        "//folly/lang:safe_alias",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "safe_assert_test",
+    srcs = ["SafeAssertTest.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:benchmark",
+        "//folly:conv",
+        "//folly/lang:keep",
+        "//folly/lang:safe_assert",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "safe_closure_test",
+    srcs = ["SafeClosureTest.cpp"],
+    deps = [
+        "//folly/coro/safe:captures",
+        "//folly/lang:safe_closure",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "source_location_test",
+    srcs = ["source_location_test.cpp"],
+    deps = [
+        "//folly:conv",
+        "//folly/lang:source_location",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "strong_test",
+    srcs = ["StrongTest.cpp"],
+    deps = [
+        "//folly/hash:traits",
+        "//folly/lang:strong",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "switch_test",
+    srcs = ["SwitchTest.cpp"],
+    deps = [
+        "//folly/lang:switch",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "cstring_view_test",
+    srcs = ["cstring_view_test.cpp"],
+    supports_static_listing = False,
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:fbstring",
+        "//folly:range",
+        "//folly/lang:cstring_view",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "thunk_test",
+    srcs = ["ThunkTest.cpp"],
+    deps = [
+        "//folly:traits",
+        "//folly/lang:thunk",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "to_ascii_bench",
+    srcs = ["ToAsciiBench.cpp"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:benchmark",
+        "//folly/lang:keep",
+        "//folly/lang:to_ascii",
+        "//folly/portability:fmt_compile",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "to_ascii_test",
+    srcs = ["ToAsciiTest.cpp"],
+    deps = [
+        "//folly:traits",
+        "//folly/lang:to_ascii",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "type_info_test",
+    srcs = ["TypeInfoTest.cpp"],
+    deps = [
+        "//folly/lang:type_info",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "vector_traits_test",
+    srcs = ["VectorTraitsTest.cpp"],
+    deps = [
+        "//folly/lang:vector_traits",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "badge_test",
+    srcs = ["BadgeTest.cpp"],
+    deps = [
+        "//folly/lang:badge",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "bits_class_benchmark",
+    srcs = ["BitsClassBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:benchmark",
+        "//folly/lang:bits_class",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "bits_class_test",
+    srcs = ["BitsClassTest.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly/lang:bits_class",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+    ],
+)

@@ -1,0 +1,85 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_benchmark.bzl", "fb_dirsync_cpp_benchmark")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_benchmark(
+    name = "settings_bench",
+    srcs = ["SettingsBenchmarks.cpp"],
+    deps = [
+        ":a",
+        "//folly:benchmark",
+        "//folly:c_portability",
+        "//folly/init:init",
+        "//folly/settings:settings",
+        "//folly/synchronization/test:barrier",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "settings_test",
+    srcs = [
+        "SettingsTest.cpp",
+    ],
+    labels = ["case-isolation-failure"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        ":a",
+        ":b",
+        "//folly:format",
+        "//folly:random",
+        "//folly:string",
+        "//folly/observer/detail:observer_manager",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/settings:observer",
+        "//folly/settings:settings",
+        "//folly/synchronization/test:barrier",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "command_line_parser_test",
+    srcs = [
+        "CommandLineParserTest.cpp",
+    ],
+    labels = ["case-isolation-failure"],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "fbsource//third-party/googletest:gtest",
+        "//folly:conv",
+        "//folly:string",
+        "//folly/container:array",
+        "//folly/logging:logging",
+        "//folly/settings:command_line_parser",
+        "//folly/settings:settings",
+        "//folly/settings:settings_accessor_proxy",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "a",
+    srcs = [
+        "a.cpp",
+    ],
+    headers = [
+        "a.h",
+    ],
+    exported_deps = [
+        "//folly/settings:settings",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "b",
+    srcs = [
+        "b.cpp",
+    ],
+    headers = [
+        "b.h",
+    ],
+    exported_deps = [
+        "//folly/settings:settings",
+    ],
+)

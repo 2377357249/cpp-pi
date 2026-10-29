@@ -1,0 +1,77 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "contains",
+    srcs = ["Contains.cpp"],
+    headers = ["Contains.h"],
+    use_raw_headers = True,
+    deps = [
+        "//folly/algorithm/simd/detail:simd_contains_impl",
+    ],
+    exported_deps = [
+        "//folly:c_portability",
+        "//folly/algorithm/simd/detail:traits",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "find_first_of",
+    headers = ["find_first_of.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":movemask",
+        "//folly:portability",
+        "//folly:utility",
+        "//folly/container:sparse_byte_set",
+        "//folly/lang:align",
+        "//folly/lang:bits",
+        "//folly/lang:hint",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "find_first_of_extra",
+    headers = ["find_first_of_extra.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:range",
+    ] + select({
+        "DEFAULT": [],
+        "ovr_config//runtime:fbcode-no-arvr": [
+            "fbsource//third-party/tbb:tp2-or-buckified-tbb",
+        ],
+    }),
+)
+
+fb_dirsync_cpp_library(
+    name = "find_fixed",
+    headers = ["FindFixed.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":movemask",
+        "//folly:portability",
+        "//folly/algorithm/simd/detail:traits",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "ignore",
+    headers = ["Ignore.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/lang:bits",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "movemask",
+    headers = ["Movemask.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":ignore",
+        "//folly:portability",
+        "//folly/lang:bits",
+    ],
+)

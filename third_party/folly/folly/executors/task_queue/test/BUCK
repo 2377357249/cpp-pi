@@ -1,0 +1,62 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_benchmark.bzl", "fb_dirsync_cpp_benchmark")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_benchmark(
+    name = "UnboundedBlockingQueueBench",
+    srcs = ["UnboundedBlockingQueueBench.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:benchmark",
+        "//folly/executors/task_queue:unbounded_blocking_queue",
+        "//folly/init:init",
+        "//folly/synchronization/test:barrier",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "PriorityUnboundedBlockingQueueTest",
+    srcs = ["PriorityUnboundedBlockingQueueTest.cpp"],
+    deps = [
+        "//folly/container:enumerate",
+        "//folly/executors/task_queue:priority_unbounded_blocking_queue",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "UnboundedBlockingQueueTest",
+    srcs = ["UnboundedBlockingQueueTest.cpp"],
+    deps = [
+        "//folly/executors/task_queue:unbounded_blocking_queue",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "PriorityLifoSemMPMCQueueTest",
+    srcs = ["PriorityLifoSemMPMCQueueTest.cpp"],
+    deps = [
+        "//folly:range",
+        "//folly/container:enumerate",
+        "//folly/executors/task_queue:priority_lifo_sem_mpmc_queue",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "striped_priority_unbounded_blocking_queue_test",
+    srcs = [
+        "StripedPriorityUnboundedBlockingQueueTest.cpp",
+    ],
+    deps = [
+        "//folly:random",
+        "//folly/executors:cpu_thread_pool_executor",
+        "//folly/executors/task_queue:striped_priority_unbounded_blocking_queue",
+        "//folly/portability:gtest",
+        "//folly/system:hardware_concurrency",
+    ],
+)

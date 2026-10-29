@@ -1,0 +1,27 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "lib",
+    srcs = ["lib.cpp"],
+    headers = ["lib.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:range",
+        "//folly/logging:logging",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "example",
+    srcs = ["main.cpp"],
+    deps = [
+        ":lib",
+        "//folly/init:init",
+        "//folly/logging:init",
+        "//folly/logging:logging",
+    ],
+)

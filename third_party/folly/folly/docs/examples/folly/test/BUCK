@@ -1,0 +1,13 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "test_util_demo",
+    srcs = ["TestUtils.cpp"],
+    headers = [],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/test:test_utils",
+    ],
+)

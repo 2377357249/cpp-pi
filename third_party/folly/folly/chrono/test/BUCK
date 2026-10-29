@@ -1,0 +1,24 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "clock_test",
+    srcs = ["ClockTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/chrono:clock",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "conv_test",
+    srcs = ["ConvTest.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly/chrono:conv",
+        "//folly/portability:gtest",
+    ],
+)

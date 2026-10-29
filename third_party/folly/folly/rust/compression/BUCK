@@ -1,0 +1,30 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rust_library.bzl", "fb_dirsync_rust_library")
+
+oncall("rust_libraries")
+
+fb_dirsync_rust_library(
+    name = "folly_compression",
+    srcs = ["compression.rs"],
+    cpp_deps = [":compression-ffi"],
+    crate_root = "compression.rs",
+    cxx_bridge = "compression.rs",
+    deps = [
+        "fbsource//third-party/rust:bytes",
+        "fbsource//third-party/rust:cxx",
+        "fbsource//third-party/rust:thiserror",
+        "//folly/rust/iobuf:iobuf_actual",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "compression-ffi",
+    srcs = ["compression.cpp"],
+    headers = ["compression.h"],
+    preferred_linkage = "static",
+    exported_deps = [
+        "fbsource//third-party/rust:cxx-core",
+        "//folly/compression:compression",
+        "//folly/io:iobuf",
+    ],
+)

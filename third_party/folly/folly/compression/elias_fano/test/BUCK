@@ -1,0 +1,29 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "bitvector_test",
+    srcs = ["BitVectorCodingTest.cpp"],
+    deps = [
+        "//folly:benchmark",
+        "//folly/compression:select64",
+        "//folly/compression/elias_fano:bit_vector_coding",
+        "//folly/compression/test:coding_test_utils",
+        "//folly/init:init",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "eliasfano_test",
+    srcs = ["EliasFanoCodingTest.cpp"],
+    labels = ["slow"],
+    deps = [
+        "//folly:benchmark",
+        "//folly:random",
+        "//folly/compression:select64",
+        "//folly/compression/elias_fano:elias_fano_coding",
+        "//folly/compression/test:coding_test_utils",
+        "//folly/init:init",
+    ],
+)

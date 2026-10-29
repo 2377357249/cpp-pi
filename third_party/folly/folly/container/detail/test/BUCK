@@ -1,0 +1,26 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "f14_detail_test",
+    srcs = [
+        "F14DetailTest.cpp",
+    ],
+    deps = [
+        "//folly:traits",
+        "//folly/container/detail:f14_hash_detail",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "bool_wrapper_test",
+    srcs = [
+        "BoolWrapperTest.cpp",
+    ],
+    deps = [
+        "//folly/container/detail:bool_wrapper",
+        "//folly/portability:gtest",
+    ],
+)

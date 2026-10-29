@@ -1,0 +1,14 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "double_radix_sort_test",
+    srcs = ["DoubleRadixSortTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly:random",
+        "//folly/portability:gtest",
+        "//folly/stats/detail:double_radix_sort",
+    ],
+)

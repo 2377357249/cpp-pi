@@ -1,0 +1,31 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "async_closure",
+    headers = ["AsyncClosure.h"],
+    exported_deps = [
+        ":bind_async_closure",
+        "//folly/coro:value_or_fatal",
+        "//folly/coro/safe:safe_task",
+        "//folly/detail:tuple",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "bind_async_closure",
+    headers = ["BindAsyncClosure.h"],
+    exported_deps = [
+        "//folly/coro/safe:bind_captures",
+        "//folly/coro/safe:captures",
+        "//folly/lang:safe_alias",
+        "//folly/lang/bind:named",
+        "//folly/lang/bind:named_to_storage",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "define_movable_deep_const_lref_copyable",
+    headers = ["DefineMovableDeepConstLrefCopyable.h"],
+)

@@ -1,0 +1,169 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_binary(
+    name = "iobuf_benchmark",
+    srcs = ["IOBufBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly/io:iobuf",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "iobuf_test",
+    srcs = ["IOBufTest.cpp"],
+    headers = [],
+    allocator = "jemalloc_debug",
+    supports_static_listing = False,
+    deps = [
+        "//folly:range",
+        "//folly/io:iobuf",
+        "//folly/io:typed_io_buf",
+        "//folly/memory:malloc",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "iobuf_cb_test",
+    srcs = ["IOBufCBTest.cpp"],
+    headers = [],
+    allocator = "jemalloc_debug",
+    deps = [
+        "//folly/io:iobuf",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "iobuf_cursor_benchmark",
+    srcs = ["IOBufCursorBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly:format",
+        "//folly:range",
+        "//folly/io:iobuf",
+        "//folly/lang:keep",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "iobuf_cursor_test",
+    srcs = ["IOBufCursorTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly:format",
+        "//folly:range",
+        "//folly/io:iobuf",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "iobuf_network_bench",
+    srcs = ["NetworkBenchmark.cpp"],
+    headers = [],
+    allocator = "jemalloc",
+    deps = [
+        "//folly:benchmark",
+        "//folly/io:iobuf",
+        "//folly/portability:gflags",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "iobuf_queue_test",
+    srcs = ["IOBufQueueTest.cpp"],
+    headers = [],
+    supports_static_listing = False,
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:range",
+        "//folly/io:iobuf",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "iobuf_iovec_builder_test",
+    srcs = ["IOBufIovecBuilderTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/io:iobuf",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "queueappender_benchmark",
+    srcs = ["QueueAppenderBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly:format",
+        "//folly/io:iobuf",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "record_io_test",
+    srcs = ["RecordIOTest.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:conv",
+        "//folly:fbstring",
+        "//folly:random",
+        "//folly/io:iobuf",
+        "//folly/io:record_io",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+        "//folly/portability:unistd",
+        "//folly/testing:test_util",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "shutdown_socket_set_test",
+    srcs = ["ShutdownSocketSetTest.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly/io:shutdown_socket_set",
+        "//folly/net:net_ops",
+        "//folly/net:network_socket",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "socket_option_value_test",
+    srcs = ["SocketOptionValueTest.cpp"],
+    headers = [],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:conv",
+        "//folly/io:socket_option_map",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "fs_util_test",
+    srcs = ["FsUtilTest.cpp"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "fbsource//third-party/glog:glog",
+        "//folly:string",
+        "//folly/io:fs_util",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/testing:test_util",
+    ],
+)

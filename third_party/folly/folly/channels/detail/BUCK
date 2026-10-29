@@ -1,0 +1,68 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "atomic_queue",
+    headers = [
+        "AtomicQueue.h",
+    ],
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly/lang:assume",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "channel_bridge",
+    headers = ["ChannelBridge.h"],
+    exported_deps = [
+        "//folly:try",
+        "//folly/channels/detail:atomic_queue",
+    ],
+)
+
+# !!!! fbcode/folly/channels/detail/TARGETS was merged into this file, see https://fburl.com/workplace/xl8l9yuo for more info !!!!
+
+fb_dirsync_cpp_library(
+    name = "intrusive_ptr",
+    headers = ["IntrusivePtr.h"],
+    exported_deps = [
+        "fbsource//third-party/boost:boost",  # @manual
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "multiplexer_traits",
+    headers = ["MultiplexerTraits.h"],
+    exported_deps = [
+        "//folly:traits",
+        "//folly/functional:traits",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "pointer_variant",
+    headers = ["PointerVariant.h"],
+    exported_deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:demangle",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "utility",
+    headers = [
+        "Utility.h",
+    ],
+    exported_deps = [
+        "//folly:exception_wrapper",
+        "//folly:function",
+        "//folly:scope_guard",
+        "//folly/channels:channel",
+        "//folly/channels:rate_limiter",
+        "//folly/coro:promise",
+        "//folly/coro:task",
+        "//folly/executors:sequenced_executor",
+    ],
+)

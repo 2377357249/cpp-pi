@@ -1,0 +1,36 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rust_library.bzl", "fb_dirsync_rust_library")
+
+oncall("rust_libraries")
+
+fb_dirsync_cpp_library(
+    name = "memory-cpp",
+    srcs = [
+        "memory.cpp",
+    ],
+    headers = [
+        "memory.h",
+    ],
+    preferred_linkage = "static",
+    undefined_symbols = True,
+    deps = [
+        "//folly/memory:mallctl_helper",
+    ],
+    exported_deps = [
+        "fbsource//third-party/rust:cxx-core",
+        "//folly/memory:malloc",
+    ],
+)
+
+fb_dirsync_rust_library(
+    name = "memory",
+    srcs = [
+        "lib.rs",
+    ],
+    cpp_deps = [":memory-cpp"],
+    cxx_bridge = "lib.rs",
+    deps = [
+        "fbsource//third-party/rust:anyhow",
+        "fbsource//third-party/rust:cxx",
+    ],
+)

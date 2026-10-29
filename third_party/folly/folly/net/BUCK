@@ -1,0 +1,76 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "net_ops",
+    srcs = ["NetOps.cpp"],
+    headers = ["NetOps.h"],
+    use_raw_headers = True,
+    deps = [
+        "//folly:c_portability",
+        "//folly:scope_guard",
+        "//folly/net/detail:socket_file_descriptor_map",
+    ],
+    exported_deps = [
+        ":network_socket",
+        "//folly:portability",
+        "//folly/portability:iovec",
+        "//folly/portability:sys_types",
+        "//folly/portability:time",
+        "//folly/portability:windows",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "network_socket",
+    headers = ["NetworkSocket.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly/net/detail:socket_file_descriptor_map",
+        "//folly/portability:windows",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "tcpinfo",
+    srcs = ["TcpInfo.cpp"],
+    headers = [
+        "TcpInfo.h",
+        "TcpInfoTypes.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly/portability:sockets",
+    ],
+    exported_deps = [
+        ":net_ops_dispatcher",
+        ":network_socket",
+        "//folly:expected",
+        "//folly:optional",
+        "//folly:string",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "net_ops_dispatcher",
+    srcs = ["NetOpsDispatcher.cpp"],
+    headers = ["NetOpsDispatcher.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":net_ops",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "tcpinfo_dispatcher",
+    srcs = ["TcpInfoDispatcher.cpp"],
+    headers = ["TcpInfoDispatcher.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":net_ops_dispatcher",
+        ":tcpinfo",
+        "//folly:expected",
+    ],
+)

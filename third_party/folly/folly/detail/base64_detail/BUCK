@@ -1,0 +1,118 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "base64_common",
+    headers = ["Base64Common.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":base64_constants",
+        "//folly:utility",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "base64_constants",
+    headers = ["Base64Constants.h"],
+    use_raw_headers = True,
+)
+
+fb_dirsync_cpp_library(
+    name = "base64_hidden_constants",
+    headers = ["Base64HiddenConstants.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":base64_constants",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "base64_scalar",
+    headers = ["Base64Scalar.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":base64_common",
+        ":base64_constants",
+        "//folly:utility",
+        "//folly/memory:uninitialized_memory_hacks",
+        "//folly/portability:constexpr",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "base64_simd",
+    headers = ["Base64Simd.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":base64_common",
+        ":base64_constants",
+        ":base64_hidden_constants",
+        ":base64_scalar",
+        ":base64_swar",
+        "//folly:c_portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "base64_sse4_2_platform",
+    headers = ["Base64_SSE4_2_Platform.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":base64_hidden_constants",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "base64_sse4_2",
+    srcs = ["Base64_SSE4_2.cpp"],
+    headers = ["Base64_SSE4_2.h"],
+    compiler_flags = select({
+        "DEFAULT": [],
+        "ovr_config//cpu:x86_64": ["-msse4.2"],
+    }),
+    use_raw_headers = True,
+    deps = [
+        ":base64_simd",
+        ":base64_sse4_2_platform",
+    ],
+    exported_deps = [
+        ":base64_common",
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "base64_swar",
+    srcs = ["Base64SWAR.cpp"],
+    headers = ["Base64SWAR.h"],
+    use_raw_headers = True,
+    deps = [
+        ":base64_constants",
+        ":base64_hidden_constants",
+        ":base64_scalar",
+        "//folly:portability",
+    ],
+    exported_deps = [
+        ":base64_common",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "base64_api",
+    srcs = ["Base64Api.cpp"],
+    headers = ["Base64Api.h"],
+    use_raw_headers = True,
+    deps = [
+        ":base64_sse4_2",
+        ":base64_swar",
+        "//folly:cpu_id",
+    ],
+    exported_deps = [
+        ":base64_common",
+        ":base64_scalar",
+        "//folly:portability",
+        "//folly/portability:constexpr",
+    ],
+)

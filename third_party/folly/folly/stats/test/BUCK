@@ -1,0 +1,197 @@
+load("@fbsource//tools/build_defs:platform_defs.bzl", "CXX", "FBCODE")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_benchmark.bzl", "fb_dirsync_cpp_benchmark")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_benchmark(
+    name = "tdigest_benchmark",
+    srcs = ["TDigestBenchmark.cpp"],
+    platforms = (CXX, FBCODE),
+    deps = [
+        "//folly:benchmark",
+        "//folly/portability:gflags",
+        "//folly/stats:digest_builder",
+        "//folly/stats:tdigest",
+    ],
+)
+
+# !!!! fbcode/folly/stats/test/TARGETS was merged into this file, see https://fburl.com/workplace/xl8l9yuo for more info !!!!
+
+fb_dirsync_cpp_unittest(
+    name = "buffered_stat_test",
+    srcs = ["BufferedStatTest.cpp"],
+    deps = [
+        "//folly:range",
+        "//folly/portability:gtest",
+        "//folly/stats/detail:buffered_stat",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "digest_builder_benchmark",
+    srcs = ["DigestBuilderBenchmark.cpp"],
+    args = [
+        "--json",
+    ],
+    deps = [
+        "//folly:benchmark",
+        "//folly:range",
+        "//folly/lang:keep",
+        "//folly/portability:gflags",
+        "//folly/stats:digest_builder",
+        "//folly/synchronization/test:barrier",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "digest_builder_test",
+    srcs = ["DigestBuilderTest.cpp"],
+    deps = [
+        "//folly:range",
+        "//folly/portability:gtest",
+        "//folly/stats:digest_builder",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "histogram_benchmark",
+    srcs = ["HistogramBenchmark.cpp"],
+    args = [
+        "--json",
+    ],
+    deps = [
+        "//folly:benchmark",
+        "//folly/container:irange",
+        "//folly/portability:gflags",
+        "//folly/stats:histogram",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "histogram_test",
+    srcs = ["HistogramTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/stats:histogram",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "streaming_stats_test",
+    srcs = ["StreamingStatsTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/stats:streaming_stats",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "bucketed_time_series_benchmark",
+    srcs = ["BucketedTimeSeriesBenchmark.cpp"],
+    args = [
+        "--json",
+    ],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:benchmark",
+        "//folly/stats:bucketed_time_series",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "multi_level_time_series_benchmark",
+    srcs = ["MultiLevelTimeSeriesBenchmark.cpp"],
+    deps = [
+        "//folly:benchmark",
+        "//folly/init:init",
+        "//folly/stats:multi_level_time_series",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "quantile_estimator_benchmark",
+    srcs = ["QuantileEstimatorBenchmark.cpp"],
+    args = [
+        "--json",
+    ],
+    deps = [
+        "//folly:benchmark",
+        "//folly/portability:gflags",
+        "//folly/stats:quantile_estimator",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "quantile_estimator_test",
+    srcs = ["QuantileEstimatorTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/stats:quantile_estimator",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "quantile_histogram_benchmark",
+    srcs = ["QuantileHistogramBenchmark.cpp"],
+    args = [
+        "--json",
+    ],
+    deps = [
+        "//folly:benchmark",
+        "//folly/portability:gflags",
+        "//folly/stats:quantile_histogram",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "quantile_histogram_test",
+    srcs = ["QuantileHistogramTest.cpp"],
+    deps = [
+        "//folly:range",
+        "//folly/portability:gtest",
+        "//folly/stats:quantile_histogram",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "sliding_window_test",
+    srcs = ["SlidingWindowTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/stats/detail:sliding_window",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "tdigest_test",
+    srcs = ["TDigestTest.cpp"],
+    supports_static_listing = False,
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/stats:tdigest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "time_series_test",
+    srcs = ["TimeSeriesTest.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:random",
+        "//folly/container:irange",
+        "//folly/portability:gtest",
+        "//folly/stats:bucketed_time_series",
+        "//folly/stats:multi_level_time_series",
+        "//folly/stats/detail:bucket",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "timeseries_histogram_test",
+    srcs = ["TimeseriesHistogramTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/stats:timeseries_histogram",
+    ],
+)

@@ -1,0 +1,63 @@
+# @fb-only[end= ]: load("@fbcode//gdb/scripts/tests/common:gdb_unittest.bzl", "gdb_unittest")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rule.bzl", "fb_dirsync_rule")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "gdb_util",
+    headers = ["GdbUtil.h"],
+    exported_deps = [
+        "//folly:c_portability",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "main",
+    srcs = ["main.cpp"],
+    compiler_flags = [
+        "-fno-debug-types-section",
+        "-fstandalone-debug",
+        "-g",
+        "-gdwarf-4",
+        "-gno-simple-template-names",
+        "-gno-split-dwarf",
+    ],
+    default_strip_mode = "none",
+    modules = False,
+    deps = [
+        ":gdb_util",
+        "//folly:network_address",
+        "//folly:range",
+        "//folly:small_vector",
+        "//folly/container:f14_hash",
+        "//folly/json:dynamic",
+    ],
+)
+
+# @lint-ignore-every BUCKFORMAT
+
+# Test all of the printers in the folly gdb extension
+# @fb-only[end= ]: fb_dirsync_rule(
+    # @fb-only[end= ]: name = "test",
+    # @fb-only[end= ]: binary = "main",
+    # @fb-only[end= ]: fbcode_only = True,
+    # @fb-only[end= ]: fbcode_rule = gdb_unittest,
+    # @fb-only[end= ]: gdb = "fbcode//third-party-buck/projects/gdb:bin/gdb",
+    # @fb-only[end= ]: gdb_libraries = [
+        # @fb-only[end= ]: "fbcode//third-party-buck/projects/expat:expat[soname-lib]",
+        # @fb-only[end= ]: "fbcode//third-party-buck/projects/gmp:gmp[soname-lib]",
+        # @fb-only[end= ]: "fbcode//third-party-buck/projects/mpfr:mpfr[soname-lib]",
+        # @fb-only[end= ]: "fbcode//third-party-buck/projects/zlib:z[soname-lib]",
+    # @fb-only[end= ]: ],
+    # @fb-only[end= ]: modifiers = ["ovr_config//third-party/zlib/constraints:1.3.1"],
+    # @fb-only[end= ]: remote_execution = "disabled",
+    # @fb-only[end= ]: script = "runtest.gdb",
+    # @fb-only[end= ]: skip_modes = [
+        # @fb-only[end= ]: "dev",
+        # @fb-only[end= ]: "libcxx",
+        # @fb-only[end= ]: "opt*",
+    # @fb-only[end= ]: ],
+    # @fb-only[end= ]: source_root = "fbcode",
+# @fb-only[end= ]: )

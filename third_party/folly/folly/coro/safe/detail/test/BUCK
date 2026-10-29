@@ -1,0 +1,23 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "bind_async_closure_test",
+    srcs = ["BindAsyncClosureTest.cpp"],
+    deps = [
+        "//folly/coro:task",
+        "//folly/coro:value_or_fatal",
+        "//folly/coro/safe/detail:bind_async_closure",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "define_movable_deep_const_lref_copyable_test",
+    srcs = ["DefineMovableDeepConstLrefCopyableTest.cpp"],
+    deps = [
+        "//folly/coro/safe/detail:define_movable_deep_const_lref_copyable",
+        "//folly/portability:gtest",
+    ],
+)

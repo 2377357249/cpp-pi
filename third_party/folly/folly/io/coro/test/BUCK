@@ -1,0 +1,20 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "transport_test",
+    srcs = [
+        "TransportTest.cpp",
+    ],
+    deps = [
+        "//folly:portability",
+        "//folly/coro:blocking_wait",
+        "//folly/coro:collect",
+        "//folly/io/async/test:async_socket_test_lib",
+        "//folly/io/async/test:mocks",
+        "//folly/io/async/test:scoped_bound_port",
+        "//folly/io/coro:socket",
+        "//folly/portability:gtest",
+    ],
+)

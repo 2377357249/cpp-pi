@@ -1,0 +1,15 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "random_seed_test",
+    srcs = ["RandomSeedTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly:portability",
+        "//folly/hash/detail:random_seed",
+        "//folly/portability:gtest",
+        "//folly/test:test_utils",
+    ],
+)

@@ -1,0 +1,28 @@
+{
+  "prompt": "input/author-prompt.md",
+  "inputs": [
+    {
+      "source": "input/request.md",
+      "destination": "request.md"
+    },
+    {
+      "source": "input/adjacent_dedup.cpp.txt",
+      "destination": "adjacent_dedup.cpp"
+    }
+  ],
+  "packages_under_test": [
+    "task-ledger",
+    "rule-conflicts",
+    "design-vetting",
+    "write",
+    "critic-iterate",
+    "code"
+  ],
+  "rules": [
+    "task-ledger.md",
+    "rule-conflicts.md",
+    "design-vetting.md",
+    "code.md",
+    "critic-iterate.md"
+  ]
+}

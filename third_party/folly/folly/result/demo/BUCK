@@ -1,0 +1,15 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_binary(
+    name = "basketball",
+    srcs = ["basketball.cpp"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:portability",
+        "//folly/result:coro",
+        "//folly/result:epitaph",
+        "//folly/result:errc_rich_error",
+    ],
+)

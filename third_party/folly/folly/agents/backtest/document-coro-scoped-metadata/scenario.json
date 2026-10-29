@@ -1,0 +1,44 @@
+{
+  "prompt": "input/author-prompt.md",
+  "no_rules_prompt": "input/author-prompt.no-rules.md",
+  "inputs": [
+    {
+      "source": "input/input-map.md",
+      "destination": "input-map.md"
+    },
+    {
+      "source": "input/conversation.md",
+      "destination": "conversation.md"
+    },
+    {
+      "source": "input/working-review.md",
+      "destination": "working-review.md"
+    },
+    {
+      "source": "input/request.md",
+      "destination": "request.md"
+    },
+    {
+      "source": "input/later-design-clarifications.md",
+      "destination": "later-design-clarifications.md"
+    },
+    {
+      "source": "input/source",
+      "destination": "source"
+    }
+  ],
+  "packages_under_test": [
+    "task-ledger",
+    "rule-conflicts",
+    "design-vetting",
+    "write",
+    "critic-iterate"
+  ],
+  "rules": [
+    "task-ledger.md",
+    "rule-conflicts.md",
+    "design-vetting.md",
+    "write.md",
+    "critic-iterate.md"
+  ]
+}

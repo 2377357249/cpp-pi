@@ -1,0 +1,549 @@
+load("@fbsource//tools/build_defs:testpilot_defs.bzl", "tpx_labels")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_benchmark.bzl", "fb_dirsync_cpp_benchmark")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_binary.bzl", "fb_dirsync_cpp_binary")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "atomic_notification_test",
+    srcs = [
+        "AtomicNotificationTest.cpp",
+    ],
+    deps = [
+        "//folly:optional",
+        "//folly/portability:gtest",
+        "//folly/synchronization:atomic_notification",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "atomic_ref_test",
+    srcs = ["AtomicRefTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/synchronization:atomic_ref",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "atomic_struct_test",
+    srcs = ["AtomicStructTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/synchronization:atomic_struct",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "atomic_util_bench",
+    srcs = ["AtomicUtilBench.cpp"],
+    deps = [
+        "//folly:benchmark",
+        "//folly:constexpr_math",
+        "//folly/init:init",
+        "//folly/lang:aligned",
+        "//folly/lang:assume",
+        "//folly/lang:keep",
+        "//folly/synchronization:atomic_util",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "atomic_util_test",
+    srcs = ["AtomicUtilTest.cpp"],
+    supports_static_listing = False,
+    deps = [
+        "//folly:benchmark",
+        "//folly:portability",
+        "//folly:utility",
+        "//folly/portability:gtest",
+        "//folly/synchronization:atomic_ref",
+        "//folly/synchronization:atomic_util",
+        "//folly/synchronization:relaxed_atomic",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "barrier",
+    headers = ["Barrier.h"],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "barrier_test",
+    srcs = ["BarrierTest.cpp"],
+    deps = [
+        ":barrier",
+        "//folly/portability:gtest",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "baton_benchmark",
+    srcs = ["BatonBenchmark.cpp"],
+    deps = [
+        ":baton_test_helpers",
+        "//folly:benchmark",
+        "//folly/synchronization:baton",
+        "//folly/synchronization:native_semaphore",
+        "//folly/test:deterministic_schedule",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "baton_test",
+    srcs = ["BatonTest.cpp"],
+    deps = [
+        ":baton_test_helpers",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+        "//folly/test:deterministic_schedule",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "baton_test_helpers",
+    headers = ["BatonTestHelpers.h"],
+    exported_deps = [
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+        "//folly/test:deterministic_schedule",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "call_once_benchmark",
+    srcs = ["CallOnceBenchmark.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:benchmark",
+        "//folly/lang:keep",
+        "//folly/synchronization:call_once",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "call_once_test",
+    srcs = ["CallOnceTest.cpp"],
+    deps = [
+        "//folly:traits",
+        "//folly/portability:gtest",
+        "//folly/synchronization:call_once",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "delayed_init_test",
+    srcs = ["DelayedInitTest.cpp"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        ":barrier",
+        "//folly/portability:gtest",
+        "//folly/synchronization:delayed_init",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "distributed_mutex_test",
+    srcs = [
+        "DistributedMutexTest.cpp",
+    ],
+    labels = [
+        tpx_labels.heavyweight,
+        "slow",
+    ],
+    deps = [
+        "//folly:map_util",
+        "//folly:synchronized",
+        "//folly/container:array",
+        "//folly/container:foreach",
+        "//folly/lang:customization_point",
+        "//folly/lang:keep",
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+        "//folly/synchronization:distributed_mutex",
+        "//folly/system:hardware_concurrency",
+        "//folly/test:deterministic_schedule",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "distributed_mutex_interference_size_test",
+    srcs = [
+        "DistributedMutexInterferenceSizeTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:scope_guard",
+        "//folly/portability:gtest",
+        "//folly/synchronization:distributed_mutex",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "hazptr_test",
+    srcs = ["HazptrTest.cpp"],
+    deps = [
+        ":barrier",
+        "//folly:singleton",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+        "//folly/synchronization:hazptr",
+        "//folly/synchronization:hazptr_thread_pool_executor",
+        "//folly/synchronization/example:hazptr_lock_free_lifo",
+        "//folly/synchronization/example:hazptr_swmr_set",
+        "//folly/synchronization/example:hazptr_wide_cas",
+        "//folly/test:deterministic_schedule",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "hazptr_tc_test",
+    srcs = ["HazptrTcTest.cpp"],
+    deps = [
+        "//folly/lang:bits",
+        "//folly/portability:gtest",
+        "//folly/synchronization:hazptr",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "hazptr_cohort_mt_bench",
+    srcs = ["HazptrCohortMTBench.cpp"],
+    deps = [
+        ":barrier",
+        "//folly:benchmark",
+        "//folly/lang:align",
+        "//folly/portability:gflags",
+        "//folly/synchronization:hazptr",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "hazptr_bench",
+    srcs = ["HazptrBench.cpp"],
+    deps = [
+        "//folly:benchmark",
+        "//folly:spin_lock",
+        "//folly/concurrency:atomic_shared_ptr",
+        "//folly/concurrency:core_cached_shared_ptr",
+        "//folly/concurrency/memory:atomic_read_mostly_main_ptr",
+        "//folly/concurrency/memory:read_mostly_shared_ptr",
+        "//folly/container:enumerate",
+        "//folly/container:f14_hash",
+        "//folly/lang:keep",
+        "//folly/portability:gflags",
+        "//folly/synchronization:hazptr",
+        "//folly/synchronization:rcu",
+        "//folly/synchronization:rw_spin_lock",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "latch_test",
+    srcs = ["LatchTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/synchronization:latch",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "lifo_sem_test",
+    srcs = ["LifoSemTests.cpp"],
+    headers = [],
+    allocator = "jemalloc_debug",
+    deps = [
+        "//folly:random",
+        "//folly/portability:asm",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+        "//folly/synchronization:lifo_sem",
+        "//folly/synchronization:native_semaphore",
+        "//folly/test:deterministic_schedule",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "lifo_sem_bench",
+    srcs = ["LifoSemBench.cpp"],
+    deps = [
+        "//folly:benchmark",
+        "//folly/portability:asm",
+        "//folly/synchronization:lifo_sem",
+        "//folly/synchronization:native_semaphore",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "lock_test",
+    srcs = ["LockTest.cpp"],
+    supports_static_listing = False,
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/synchronization:lock",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "native_semaphore_test",
+    srcs = ["NativeSemaphoreTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/synchronization:native_semaphore",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "parking_lot_benchmark",
+    srcs = ["ParkingLotBenchmark.cpp"],
+    deps = [
+        ":barrier",
+        "//folly:benchmark",
+        "//folly/detail:futex",
+        "//folly/synchronization:parking_lot",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "parking_lot_test",
+    srcs = ["ParkingLotTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/synchronization:baton",
+        "//folly/synchronization:parking_lot",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "rcu_bench",
+    srcs = ["RcuBench.cpp"],
+    deps = [
+        "//folly:benchmark",
+        "//folly/synchronization:rcu",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rcu_test",
+    srcs = ["RcuTest.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        ":barrier",
+        "//folly:benchmark",
+        "//folly:random",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+        "//folly/synchronization:rcu",
+        "//folly/synchronization:relaxed_atomic",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "relaxed_atomic_test",
+    srcs = ["RelaxedAtomicTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/synchronization:atomic_util",
+        "//folly/synchronization:relaxed_atomic",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "rw_spin_lock_test",
+    srcs = ["RWSpinLockTest.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly/portability:gflags",
+        "//folly/portability:gtest",
+        "//folly/portability:unistd",
+        "//folly/synchronization:rw_spin_lock",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "saturating_semaphore_test",
+    srcs = ["SaturatingSemaphoreTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/synchronization:saturating_semaphore",
+        "//folly/test:deterministic_schedule",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "semaphore",
+    headers = ["Semaphore.h"],
+    deps = ["fbsource//third-party/boost:boost"],
+    exported_deps = [
+        "fbsource//third-party/boost:boost",
+        "//folly:optional",
+        "//folly:scope_guard",
+        "//folly/lang:exception",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "semaphore_test",
+    srcs = ["SemaphoreTest.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        ":barrier",
+        ":semaphore",
+        "//folly/portability:gtest",
+        "//folly/portability:sys_mman",
+        "//folly/synchronization:latch",
+    ],
+)
+
+fb_dirsync_cpp_benchmark(
+    name = "small_locks_benchmark",
+    srcs = ["SmallLocksBenchmark.cpp"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:benchmark",
+        "//folly:shared_mutex",
+        "//folly/lang:aligned",
+        "//folly/synchronization:distributed_mutex",
+        "//folly/synchronization:flat_combining",
+        "//folly/synchronization:rw_spin_lock",
+        "//folly/synchronization:small_locks",
+        "//folly/system:hardware_concurrency",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "small_locks_test",
+    srcs = ["SmallLocksTest.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:random",
+        "//folly/portability:asm",
+        "//folly/portability:gflags",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//folly/portability:pthread",
+        "//folly/portability:unistd",
+        "//folly/synchronization:small_locks",
+        "//folly/system:hardware_concurrency",
+        "//folly/test:test_utils",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "thread_cached_epoch_bench_util",
+    headers = ["ThreadCachedEpochBench.h"],
+    exported_deps = [
+        "//folly:benchmark",
+        "//folly/synchronization/detail:rcu-detail",
+    ],
+)
+
+fb_dirsync_cpp_binary(
+    name = "thread_cached_readers_bench",
+    srcs = ["ThreadCachedReadersBench.cpp"],
+    deps = [
+        ":thread_cached_epoch_bench_util",
+        "//folly:benchmark",
+        "//folly/synchronization/detail:rcu-detail",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "thread_cached_readers_test",
+    srcs = ["ThreadCachedReadersTest.cpp"],
+    deps = [
+        "//folly:thread_local",
+        "//folly/portability:gtest",
+        "//folly/synchronization/detail:rcu-detail",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "throttled_lifo_sem_test",
+    srcs = [
+        "ThrottledLifoSemTest.cpp",
+    ],
+    deps = [
+        "//folly:benchmark",
+        "//folly:random",
+        "//folly/portability:gtest",
+        "//folly/synchronization:saturating_semaphore",
+        "//folly/synchronization:throttled_lifo_sem",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "flat_combining_examples",
+    headers = ["FlatCombiningExamples.h"],
+    exported_deps = [
+        "//folly/synchronization:baton",
+        "//folly/synchronization:flat_combining",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "flat_combining_test_helpers",
+    headers = ["FlatCombiningTestHelpers.h"],
+    exported_deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:benchmark",
+        "//folly/synchronization/test:flat_combining_examples",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "flat_combining_benchmark",
+    srcs = ["FlatCombiningBenchmark.cpp"],
+    deps = [
+        ":flat_combining_test_helpers",
+        "//folly:benchmark",
+        "//folly/portability:gtest",
+        "//folly/system:hardware_concurrency",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "flat_combining_test",
+    srcs = ["FlatCombiningTest.cpp"],
+    labels = ["not_a_folly_benchmark"],
+    supports_static_listing = False,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly/portability:gtest",
+        "//folly/synchronization/test:flat_combining_test_helpers",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "event_count_test",
+    srcs = ["EventCountTest.cpp"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:random",
+        "//folly/portability:gtest",
+        "//folly/synchronization:event_count",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "striped_throttled_lifo_sem_test",
+    srcs = ["StripedThrottledLifoSemTest.cpp"],
+    deps = [
+        "//folly:random",
+        "//folly:scope_guard",
+        "//folly/portability:gtest",
+        "//folly/synchronization:striped_throttled_lifo_sem",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "thread_annotations_test",
+    srcs = ["ThreadAnnotationsTest.cpp"],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/synchronization:thread_annotations",
+    ],
+)

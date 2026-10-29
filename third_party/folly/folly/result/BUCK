@@ -1,0 +1,239 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "coded_rich_error",
+    headers = ["coded_rich_error.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":rich_error",
+        ":rich_error_base",
+        ":rich_error_code",
+        "//folly/result:rich_msg",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "coro",
+    headers = ["coro.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":result",
+        "//folly:cpp_attributes",
+        "//folly/coro:coroutine",
+        "//folly/coro:error",
+        "//folly/lang:must_use_immediately",
+        "//folly/result/detail:result_or_unwind",
+        "//folly/result/detail:result_promise",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "epitaph",
+    srcs = ["epitaph.cpp"],
+    headers = ["epitaph.h"],
+    # TODO: Remove the `select`s and link the symbolizer unconditionally once
+    # the Messenger APK SO-module layout tolerates the extra transitive deps.
+    preprocessor_flags = select({
+        "DEFAULT": [],
+        "ovr_config//os:android": ["-DFOLLY_EPITAPH_USE_SYMBOLIZER=0"],
+    }),
+    use_raw_headers = True,
+    deps = [
+        "//folly:demangle",
+        "//folly/portability:config",
+    ] + select({
+        "DEFAULT": [
+            "//folly/debugging/symbolizer:symbolizer",
+        ],
+        "ovr_config//os:android": [],
+    }),
+    exported_deps = [
+        ":result",
+        ":rich_error",
+        ":rich_error_base",
+        "//folly:cpp_attributes",
+        "//folly:portability",
+        "//folly/debugging/symbolizer:stack_trace",
+        "//folly/lang:safe_assert",
+        "//folly/result:rich_msg",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "errc_rich_error",
+    srcs = ["errc_rich_error.cpp"],
+    headers = ["errc_rich_error.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":coded_rich_error",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "gtest_helpers",
+    headers = ["gtest_helpers.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":coro",
+        "//folly/coro:gtest_helpers",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "immortal_rich_error",
+    headers = ["immortal_rich_error.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":rich_error_base",
+        "//folly:portability",
+        "//folly:traits",
+        "//folly/result/detail:ptr_immortal_exception_storage",
+        "//folly/result/detail:rich_error_common",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "nestable_coded_rich_error",
+    headers = ["nestable_coded_rich_error.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":coded_rich_error",
+        ":rich_error",
+        ":rich_error_base",
+        "//folly:portability",
+        "//folly/result:rich_msg",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "or_unwind_epitaph",
+    headers = ["or_unwind_epitaph.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":coro",
+        ":epitaph",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "result",
+    srcs = ["result.cpp"],
+    headers = ["result.h"],
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:indestructible",
+    ],
+    exported_deps = [
+        ":rich_error_base",
+        "//folly:exception_wrapper",
+        "//folly:expected",
+        "//folly:operation_cancelled",
+        "//folly:portability",
+        "//folly:utility",
+        "//folly/lang:align",
+        "//folly/lang:rvalue_reference_wrapper",
+        "//folly/portability:gtest_prod",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "rich_error",
+    headers = ["rich_error.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":rich_error_fwd",
+        "//folly:portability",
+        "//folly/lang:exception",
+        "//folly/lang:pretty",
+        "//folly/result/detail:rich_error_common",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "rich_error_base",
+    srcs = [
+        "rich_error_base.cpp",
+        "rich_exception_ptr.cpp",
+    ],
+    headers = [
+        "rich_error_base.h",
+        "rich_exception_ptr.h",
+    ],
+    use_raw_headers = True,
+    deps = [
+        "//folly:demangle",
+        "//folly/lang:safe_assert",
+        "//folly/lang:switch",
+    ],
+    exported_deps = [
+        "fbsource//third-party/fmt:fmt",
+        ":rich_error_fwd",
+        "//folly:cpp_attributes",
+        "//folly:portability",
+        "//folly:traits",
+        "//folly:unit",
+        "//folly:utility",
+        "//folly/lang:exception",
+        "//folly/lang:pretty",
+        "//folly/result/detail:rich_exception_ptr_storage",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "rich_error_code",
+    srcs = ["rich_error_code.cpp"],
+    headers = ["rich_error_code.h"],
+    use_raw_headers = True,
+    deps = ["//folly/lang:exception"],
+    exported_deps = [
+        "fbsource//third-party/fmt:fmt",
+        ":rich_error_base",
+        "//folly:portability",
+        "//folly/lang:pretty",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "rich_error_fwd",
+    headers = ["rich_error_fwd.h"],
+    use_raw_headers = True,
+    exported_deps = ["//folly:portability"],
+)
+
+fb_dirsync_cpp_library(
+    name = "rich_msg",
+    headers = ["rich_msg.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly:utility",
+        "//folly/lang:exception",
+        "//folly/lang:safe_assert",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "try",
+    headers = ["try.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":result",
+        "//folly:try",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "value_only_result",
+    headers = [
+        "value_only_result.h",
+        "value_only_result_coro.h",
+    ],
+    use_raw_headers = True,
+    exported_deps = [
+        ":result",
+        "//folly/result:coro",
+    ],
+)

@@ -1,0 +1,167 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+load("@fbsource//xplat/pfh/triage_InfrastructureSupermoduleOptou:DEFS.bzl", "triage_InfrastructureSupermoduleOptou")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "at_fork",
+    srcs = ["AtFork.cpp"],
+    headers = ["AtFork.h"],
+    feature = triage_InfrastructureSupermoduleOptou,
+    use_raw_headers = True,
+    deps = [
+        "//folly:cpp_attributes",
+        "//folly:scope_guard",
+        "//folly/lang:exception",
+        "//folly/portability:pthread",
+        "//folly/synchronization:sanitize_thread",
+    ],
+    exported_deps = [
+        "//folly:function",
+        "//folly/portability:sys_types",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "aux_vector",
+    headers = ["AuxVector.h"],
+    feature = triage_InfrastructureSupermoduleOptou,
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:portability",
+        "//folly:preprocessor",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "env_util",
+    srcs = ["EnvUtil.cpp"],
+    headers = ["EnvUtil.h"],
+    feature = triage_InfrastructureSupermoduleOptou,
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        "//folly:string",
+        "//folly/portability:stdlib",
+        "//folly/portability:unistd",
+    ],
+    exported_deps = [
+        "//folly:c_portability",
+        "//folly:memory",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "hardware_concurrency",
+    srcs = ["HardwareConcurrency.cpp"],
+    headers = ["HardwareConcurrency.h"],
+    feature = triage_InfrastructureSupermoduleOptou,
+    use_raw_headers = True,
+    deps = [
+        "//folly:conv",
+        "//folly:utility",
+        "//folly/lang:safe_assert",
+        "//folly/portability:sched",
+    ],
+    exported_deps = ["//folly/lang:cstring_view"],
+)
+
+fb_dirsync_cpp_library(
+    name = "libc",
+    srcs = ["libc.cpp"],
+    headers = ["libc.h"],
+    feature = triage_InfrastructureSupermoduleOptou,
+    use_raw_headers = True,
+    deps = [
+        "//folly:portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "memory_mapping",
+    srcs = ["MemoryMapping.cpp"],
+    headers = ["MemoryMapping.h"],
+    feature = triage_InfrastructureSupermoduleOptou,
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "fbsource//third-party/glog:glog",
+        "//folly:portability",
+        "//folly:string",
+        "//folly/io:huge_pages",
+        "//folly/portability:gflags",
+        "//folly/portability:sys_mman",
+        "//folly/portability:sys_syscall",
+    ],
+    exported_deps = [
+        "//folly:file",
+        "//folly:range",
+        "//folly/portability:unistd",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "pid",
+    srcs = ["Pid.cpp"],
+    headers = ["Pid.h"],
+    feature = triage_InfrastructureSupermoduleOptou,
+    use_raw_headers = True,
+    deps = [
+        "fbsource//third-party/glog:glog",
+        ":at_fork",
+        "//folly/portability:unistd",
+    ],
+    exported_deps = [
+        "//folly/portability:sys_types",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "shell",
+    srcs = ["Shell.cpp"],
+    headers = ["Shell.h"],
+    feature = triage_InfrastructureSupermoduleOptou,
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:conv",
+        "//folly:format",
+        "//folly:range",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "thread_id",
+    srcs = ["ThreadId.cpp"],
+    headers = ["ThreadId.h"],
+    feature = triage_InfrastructureSupermoduleOptou,
+    use_raw_headers = True,
+    deps = [
+        ":at_fork",
+        "//folly:likely",
+        "//folly/portability:pthread",
+        "//folly/portability:sys_syscall",
+        "//folly/portability:unistd",
+        "//folly/portability:windows",
+        "//folly/synchronization:relaxed_atomic",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "thread_name",
+    srcs = ["ThreadName.cpp"],
+    headers = ["ThreadName.h"],
+    feature = triage_InfrastructureSupermoduleOptou,
+    use_raw_headers = True,
+    deps = [
+        "//folly:portability",
+        "//folly:scope_guard",
+        "//folly:traits",
+        "//folly/portability:windows",
+    ],
+    exported_deps = [
+        "//folly:optional",
+        "//folly:range",
+        "//folly/portability:config",
+        "//folly/portability:pthread",
+    ],
+)

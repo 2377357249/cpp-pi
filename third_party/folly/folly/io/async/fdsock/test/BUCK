@@ -1,0 +1,16 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "async_fd_socket_test",
+    srcs = ["AsyncFdSocketTest.cpp"],
+    oncall = "thrift",
+    supports_static_listing = False,
+    deps = [
+        "//folly/io/async/fdsock:async_fd_socket",
+        "//folly/io/async/test:async_socket_test_lib",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+    ],
+)

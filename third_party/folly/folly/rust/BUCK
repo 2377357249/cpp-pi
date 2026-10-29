@@ -1,0 +1,11 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_rust_library.bzl", "fb_dirsync_rust_library")
+
+oncall("rust_libraries")
+
+fb_dirsync_rust_library(
+    name = "folly",
+    srcs = ["lib.rs"],
+    deps = [
+        "//folly/rust/string:string",
+    ],
+)

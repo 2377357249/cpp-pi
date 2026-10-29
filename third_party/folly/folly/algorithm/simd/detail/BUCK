@@ -1,0 +1,74 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_library(
+    name = "simd_any_of",
+    headers = ["SimdAnyOf.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":simd_for_each",
+        ":unroll_utils",
+        "//folly:c_portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "simd_platform",
+    headers = ["SimdPlatform.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:portability",
+        "//folly/algorithm/simd:ignore",
+        "//folly/algorithm/simd:movemask",
+        "//folly/detail:avx2",
+        "//folly/detail:sse",
+        "//folly/lang:safe_assert",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "simd_contains_impl",
+    headers = ["ContainsImpl.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":simd_any_of",
+        ":simd_platform",
+        "//folly:c_portability",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "simd_for_each",
+    headers = ["SimdForEach.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        ":unroll_utils",
+        "//folly:c_portability",
+        "//folly:traits",
+        "//folly/algorithm/simd:ignore",
+        "//folly/lang:align",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "traits",
+    headers = ["Traits.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:c_portability",
+        "//folly:memory",
+        "//folly:traits",
+        "//folly/lang:cast",
+    ],
+)
+
+fb_dirsync_cpp_library(
+    name = "unroll_utils",
+    headers = ["UnrollUtils.h"],
+    use_raw_headers = True,
+    exported_deps = [
+        "//folly:portability",
+        "//folly:traits",
+    ],
+)

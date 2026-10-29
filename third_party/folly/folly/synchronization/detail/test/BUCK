@@ -1,0 +1,15 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("fbcode_entropy_wardens_folly")
+
+fb_dirsync_cpp_unittest(
+    name = "inline_function_ref_test",
+    srcs = [
+        "InlineFunctionRefTest.cpp",
+    ],
+    deps = [
+        "//folly:c_portability",
+        "//folly/portability:gtest",
+        "//folly/synchronization/detail:inline_function_ref",
+    ],
+)

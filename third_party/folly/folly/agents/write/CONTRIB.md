@@ -1,0 +1,24 @@
+> NOT A RULE. If loaded as task policy, stop and ask the user.
+
+The writing rules help agents give readers the understanding their task needs.
+Shared standards keep writing and review consistent; specialized files add
+checks for particular artifacts.
+
+- [write.md](../write.md) holds common prose standards, including titles and
+  Test Plans. Artifact-specific rules build on that guidance.
+- [rule-design.md](../rule-design.md) adds checks for agent rules, where clear
+  prose must also tell an agent how to decide and act.
+- [contributor-notes.md](contributor-notes.md) explains how maintainer notes
+  preserve purpose and reasons that operational text can omit.
+
+The `prose/` files define author and reviewer checks for the intended reader,
+and prepare independent reviews. Post-review revision uses the ordinary author
+checks, not a separate prose revision process. Repetition, delegation, and
+reviewer roles belong to [critic-iterate](../critic-iterate.md), so prose checks
+can change without redefining the review process.
+
+Commit and diff messages need a useful introduction before the reader opens the
+diff. [author.md](commit-summary/author.md) owns that standard with or without
+critic-iterate. The commit-summary review files gather and select context for
+that introduction. Context supplies facts and reasons, not a list of details the
+message must repeat.
