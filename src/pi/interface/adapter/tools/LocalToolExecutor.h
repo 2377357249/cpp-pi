@@ -17,14 +17,17 @@ class LocalToolExecutor : public domain::IToolExecutor {
 public:
    void execute(domain::ToolCall const& call, domain::ToolResultHandler done) override {
       if (call.tool == "echo") {
-         done({call.id, "echo", "echo: " + jsonArg(call.input, "input"), false});
+         done({call.id, "echo", "echo: " + jsonArg(call.input, "input"),
+               {}, {}, -1, false});
          return;
       }
       if (call.tool == "bash") {
-         done({call.id, "bash", runBash(jsonArg(call.input, "command")), false});
+         done({call.id, "bash", runBash(jsonArg(call.input, "command")),
+               {}, {}, -1, false});
          return;
       }
-      done({call.id, call.tool, "unknown tool: " + call.tool, true});
+      done({call.id, call.tool, "unknown tool: " + call.tool,
+            {}, {}, -1, true});
    }
 
    auto availableTools() const -> std::vector<domain::Tool> override {

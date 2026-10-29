@@ -41,7 +41,9 @@ struct Completer {
    // (不 move: TurnDone 谓词还要读 lastCompletion.toolCalls)
    auto settle() -> void {
       auto& turn = ROLE(TurnStateCtx);
-      ROLE(SessionCtx).session.appendAssistant(turn.lastCompletion.message);
+      auto msg = turn.lastCompletion.message;
+      msg.stopReason = turn.lastCompletion.stopReason;
+      ROLE(SessionCtx).session.appendAssistant(std::move(msg));
    }
 
 private:

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <string>
 
 #include <folly/json/json.h>
@@ -21,16 +22,21 @@ namespace pi::iface::adapter {
 // ---------------------------------------------------------------------------
 class OpenAiProvider : public domain::ILlmProvider {
 public:
-   OpenAiProvider(std::string apiKey, std::string baseUrl, std::string model)
+   OpenAiProvider(std::string apiKey, std::string baseUrl,
+                  std::string model, std::string providerName = "openai-codex")
       : apiKey_(std::move(apiKey))
       , baseUrl_(std::move(baseUrl))
-      , model_(std::move(model)) {}
+      , model_(std::move(model))
+      , provider_(std::move(providerName)) {}
 
    void complete(domain::CompletionRequest req,
                  domain::CompletionHandler done) override {
+      auto t0   = std::chrono::steady_clock::now();
       auto body = buildBody(req);
       auto resp = post(baseUrl_ + "/responses", folly::toJson(body));
-      done(parse(resp));
+      auto ms   = std::chrono::duration_cast<std::chrono::milliseconds>(
+                     std::chrono::steady_clock::now() - t0).count();
+      done(parse(resp, ms));
    }
 
 private:
@@ -39,13 +45,27 @@ private:
       auto input = folly::dynamic::array();
       for (auto const& m : req.messages) {
          switch (m.role) {
-            case domain::Role::User:
+            case domain::Role::System:
                input.push_back(folly::dynamic::object
-                  ("type", "message")("role", "user")
+                  ("type", "message")("role", "developer")
                   ("content", folly::dynamic::array(
                      folly::dynamic::object("type", "input_text")
                                            ("text", m.text))));
                break;
+            case domain::Role::User: {
+               auto content = folly::dynamic::array();
+               if (!m.text.empty())
+                  content.push_back(folly::dynamic::object
+                     ("type", "input_text")("text", m.text));
+               for (auto const& im : m.images)
+                  content.push_back(folly::dynamic::object
+                     ("type", "input_image")
+                     ("image_url", "data:" + im.mimeType + ";base64," + im.data));
+               input.push_back(folly::dynamic::object
+                  ("type", "message")("role", "user")
+                  ("content", std::move(content)));
+               break;
+            }
             case domain::Role::Assistant:
                if (!m.text.empty())
                   input.push_back(folly::dynamic::object
@@ -85,23 +105,32 @@ private:
    }
 
    // ---------- 响应解析 ----------
-   static auto parse(std::string const& raw) -> domain::CompletionResult {
+   auto parse(std::string const& raw, int64_t durationMs) const
+      -> domain::CompletionResult {
       folly::dynamic j;
       try {
          j = folly::parseJson(raw);
       } catch (std::exception const& e) {
-         return {{domain::Role::Assistant,
-                  std::string{"provider: invalid json: "} + e.what(), {}, {}},
-                 domain::StopReason::Error};
+         domain::Message err{domain::Role::Assistant, {}, {}, {}};
+         err.errorMessage = std::string{"provider: invalid json: "}
+                          + e.what();
+         return {std::move(err), domain::StopReason::Error};
       }
       if (j.count("error") && j["error"].isObject()) {
-         return {{domain::Role::Assistant,
-                  "provider error: " +
-                     j["error"]["message"].getString(), {}, {}},
-                 domain::StopReason::Error};
+         domain::Message err{domain::Role::Assistant, {}, {}, {}};
+         err.errorMessage = "provider error: "
+                          + j["error"]["message"].getString();
+         return {std::move(err), domain::StopReason::Error};
       }
 
       domain::Message msg{domain::Role::Assistant, {}, {}, {}};
+      msg.api        = "openai-responses";
+      msg.provider   = provider_;
+      msg.model      = model_;
+      msg.durationMs = durationMs;
+      if (j.count("id"))           msg.responseId    = j["id"].getString();
+      if (j.count("model"))        msg.responseModel = j["model"].getString();
+
       if (j.count("output")) {
          for (auto const& item : j["output"]) {
             auto type = item.count("type") ? item["type"].getString()
@@ -111,6 +140,14 @@ private:
                   if (c.count("type") && c["type"].getString() == "output_text")
                      msg.text += c["text"].getString();
                }
+            } else if (type == "reasoning" && item.count("summary")) {
+               std::string t;
+               for (auto const& s : item["summary"]) {
+                  if (s.count("type") && s["type"].getString() == "summary_text")
+                     t += s["text"].getString();
+               }
+               if (!t.empty())
+                  msg.thinking.push_back(domain::ThinkingBlock{std::move(t), {}});
             } else if (type == "function_call") {
                msg.toolCalls.push_back(domain::ToolCall{
                   item.count("call_id") ? item["call_id"].getString()
@@ -122,9 +159,35 @@ private:
             }
          }
       }
-      return {std::move(msg),
-              msg.toolCalls.empty() ? domain::StopReason::Stop
-                                    : domain::StopReason::ToolUse};
+
+      // usage: Responses API 字段 (input_tokens/output_tokens/total_tokens +
+      // input_tokens_details.cached_tokens + output_tokens_details.reasoning_tokens)
+      if (j.count("usage")) {
+         auto const& u = j["usage"];
+         msg.usage.input  = u.count("input_tokens")  ? u["input_tokens"].asInt()  : 0;
+         msg.usage.output = u.count("output_tokens") ? u["output_tokens"].asInt() : 0;
+         msg.usage.totalTokens = u.count("total_tokens")
+                                 ? u["total_tokens"].asInt()
+                                 : msg.usage.input + msg.usage.output;
+         if (u.count("output_tokens_details")) {
+            auto const& d = u["output_tokens_details"];
+            if (d.count("reasoning_tokens"))
+               msg.usage.reasoning = d["reasoning_tokens"].asInt();
+         }
+         if (u.count("input_tokens_details")) {
+            auto const& d = u["input_tokens_details"];
+            if (d.count("cached_tokens"))
+               msg.usage.cacheRead = d["cached_tokens"].asInt();
+         }
+      }
+
+      auto reason = domain::StopReason::Stop;
+      if (!msg.toolCalls.empty()) reason = domain::StopReason::ToolUse;
+      if (j.count("status") && j["status"].getString() == "incomplete")
+         reason = domain::StopReason::Length;
+      if (j.count("status") && j["status"].getString() == "failed")
+         reason = domain::StopReason::Error;
+      return {std::move(msg), reason};
    }
 
    // ---------- HTTP ----------
@@ -149,7 +212,7 @@ private:
       return r.body;
    }
 
-   std::string apiKey_, baseUrl_, model_;
+   std::string apiKey_, baseUrl_, model_, provider_;
 };
 
 } // namespace pi::iface::adapter

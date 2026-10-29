@@ -15,11 +15,14 @@ struct Tool {
    std::string inputSchema;  // JSON Schema
 };
 
-// 一次工具执行的结果
+// 一次工具执行的结果 (pi ToolResultMessage)
 struct ToolResult {
    std::string toolCallId;
    std::string toolName;
-   std::string content;
+   std::string content;                 // text 块内容
+   std::vector<ImageData> images;       // image 块
+   std::string detailsJson;             // details (JSON 原文, 如 edit diff)
+   int64_t     durationMs = -1;         // <0 = 未知
    bool        isError = false;
 };
 

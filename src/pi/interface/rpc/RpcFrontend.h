@@ -430,23 +430,31 @@ private:
 
    auto sessionStatsJson() const -> folly::dynamic {
       int64_t user = 0, assistant = 0, toolCalls = 0, toolResults = 0;
+      int64_t tin = 0, tout = 0, tcacheR = 0, tcacheW = 0;
+      double  cost = 0;
       for (auto const& m : session_.messages()) {
          switch (m.role) {
             case domain::Role::User:      ++user; break;
             case domain::Role::Assistant: ++assistant;
-               toolCalls += static_cast<int64_t>(m.toolCalls.size()); break;
+               toolCalls += static_cast<int64_t>(m.toolCalls.size());
+               tin     += m.usage.input;     tout    += m.usage.output;
+               tcacheR += m.usage.cacheRead; tcacheW += m.usage.cacheWrite;
+               cost    += m.usage.cost.total;
+               break;
             case domain::Role::Tool:      ++toolResults; break;
+            case domain::Role::System:    break;
          }
       }
       auto tokens = folly::dynamic::object
-         ("input", 0)("output", 0)("cacheRead", 0)("cacheWrite", 0)("total", 0);
+         ("input", tin)("output", tout)("cacheRead", tcacheR)
+         ("cacheWrite", tcacheW)("total", tin + tout);
       folly::dynamic d = folly::dynamic::object
          ("sessionFile", session_.id() + ".jsonl")   // 骨架: 声明式路径
          ("sessionId", session_.id())
          ("userMessages", user)("assistantMessages", assistant)
          ("toolCalls", toolCalls)("toolResults", toolResults)
          ("totalMessages", static_cast<int64_t>(session_.messages().size()))
-         ("tokens", std::move(tokens))("cost", 0);
+         ("tokens", std::move(tokens))("cost", cost);
       if (!sessionName_.empty()) d["sessionName"] = sessionName_;
       return d;
    }
