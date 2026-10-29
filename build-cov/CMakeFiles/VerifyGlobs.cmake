@@ -5,7 +5,7 @@
 file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "/Users/dongxu/Desktop/code/cpp-pi/src/*.cpp")
 set(OLD_GLOB
   "/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/session/Session.cpp"
-  "/Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/cli/main.cpp"
+  "/Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/cli/main.cpp"
   )
 if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   message("-- GLOB mismatch!")

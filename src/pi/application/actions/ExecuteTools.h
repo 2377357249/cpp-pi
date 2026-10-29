@@ -3,8 +3,8 @@
 #include <trans-dsl/action/SimpleAsyncAction.h>
 #include <trans-dsl/action/TransactionInfo.h>
 
-#include <pi/application/AgentTurnImpl.h>
-#include <pi/application/Events.h>
+#include <pi/domain/AgentTurnImpl.h>
+#include <pi/domain/event/Events.h>
 
 namespace pi::app {
 
@@ -13,11 +13,11 @@ namespace pi::app {
 // ---------------------------------------------------------------------------
 DEF_SIMPLE_ASYNC_ACTION(ExecuteTools) {
    auto exec(TSL_NS::TransactionInfo const& info) -> TSL_NS::Status {
-      if (!info.toRole<ToolRunner>()->dispatch()) {
+      if (!info.toRole<domain::ToolRunner>()->dispatch()) {
          return TSL_NS::Result::SUCCESS;
       }
-      return WAIT_ON(EV_TOOLS_DONE, MSG_HANDLER(ToolsDoneMsg) {
-         trans.toRole<ToolRunner>()->settle();
+      return WAIT_ON(domain::EV_TOOLS_DONE, MSG_HANDLER(domain::ToolsDoneMsg) {
+         trans.toRole<domain::ToolRunner>()->settle();
          return TSL_NS::Result::SUCCESS;
       });
    }

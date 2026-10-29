@@ -1022,29 +1022,29 @@ src/pi/domain/session/Session.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp-pi.dir/build.make CMakeFiles/cpp-pi.dir/src/pi/domain/session/Session.cpp.s
 .PHONY : src/pi/domain/session/Session.cpp.s
 
-src/pi/presentation/cli/main.o: src/pi/presentation/cli/main.cpp.o
-.PHONY : src/pi/presentation/cli/main.o
+src/pi/interface/cli/main.o: src/pi/interface/cli/main.cpp.o
+.PHONY : src/pi/interface/cli/main.o
 
 # target to build an object file
-src/pi/presentation/cli/main.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp-pi.dir/build.make CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
-.PHONY : src/pi/presentation/cli/main.cpp.o
+src/pi/interface/cli/main.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp-pi.dir/build.make CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o
+.PHONY : src/pi/interface/cli/main.cpp.o
 
-src/pi/presentation/cli/main.i: src/pi/presentation/cli/main.cpp.i
-.PHONY : src/pi/presentation/cli/main.i
+src/pi/interface/cli/main.i: src/pi/interface/cli/main.cpp.i
+.PHONY : src/pi/interface/cli/main.i
 
 # target to preprocess a source file
-src/pi/presentation/cli/main.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp-pi.dir/build.make CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.i
-.PHONY : src/pi/presentation/cli/main.cpp.i
+src/pi/interface/cli/main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp-pi.dir/build.make CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.i
+.PHONY : src/pi/interface/cli/main.cpp.i
 
-src/pi/presentation/cli/main.s: src/pi/presentation/cli/main.cpp.s
-.PHONY : src/pi/presentation/cli/main.s
+src/pi/interface/cli/main.s: src/pi/interface/cli/main.cpp.s
+.PHONY : src/pi/interface/cli/main.s
 
 # target to generate assembly for a file
-src/pi/presentation/cli/main.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp-pi.dir/build.make CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.s
-.PHONY : src/pi/presentation/cli/main.cpp.s
+src/pi/interface/cli/main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp-pi.dir/build.make CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.s
+.PHONY : src/pi/interface/cli/main.cpp.s
 
 tests/it/RpcProtocolTest.o: tests/it/RpcProtocolTest.cpp.o
 .PHONY : tests/it/RpcProtocolTest.o
@@ -1468,9 +1468,9 @@ help:
 	@echo "... src/pi/domain/session/Session.o"
 	@echo "... src/pi/domain/session/Session.i"
 	@echo "... src/pi/domain/session/Session.s"
-	@echo "... src/pi/presentation/cli/main.o"
-	@echo "... src/pi/presentation/cli/main.i"
-	@echo "... src/pi/presentation/cli/main.s"
+	@echo "... src/pi/interface/cli/main.o"
+	@echo "... src/pi/interface/cli/main.i"
+	@echo "... src/pi/interface/cli/main.s"
 	@echo "... tests/it/RpcProtocolTest.o"
 	@echo "... tests/it/RpcProtocolTest.i"
 	@echo "... tests/it/RpcProtocolTest.s"

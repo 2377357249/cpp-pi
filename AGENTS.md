@@ -4,33 +4,44 @@
 
 ## 依赖铁律（不可违反）
 
-1. **依赖只许向下指**：`infrastructure → application → domain ← presentation`。
-   高层绝不 #include 底层头文件。端口契约（回调式签名 + 协议事件）定义在高层。
-2. **协议事件归应用层**（`application/Events.h`）；传输事件归 infrastructure；
-   领域事件归 domain。infra 适配器通过注入回调翻译事件，不 include Events.h。
-3. **domain 零依赖**：纯 C++，不 include trans-dsl、folly、任何 infra/app 头文件。
+1. **四层，依赖只许向下指**：
+   `interface → application → domain → infra`。
+   - `interface/`（pi::iface）：对外消息（rpc/cli/adapter）+ DSL 编排的事务（trans/）。
+     出向外部协议（LLM HTTP、工具进程、存储）的适配器也在这里。
+   - `application/`（pi::app）：**只放 trans-dsl action**，薄壳，转发到 role。
+   - `domain/`（pi::domain）：role（业务逻辑）+ context（状态）+ 聚合/值对象/
+     领域服务/端口/协议事件。role 间用 USE_ROLE/IMPL_ROLE 互找。
+   - `infra/`（pi::infra）：**不依赖任何 pi 层**的技术设施（log/http/shell/config），
+     所有层可用。
+2. **协议事件归 domain**（`domain/event/Events.h`）；传输事件留在 infra；
+   端口适配器经注入回调翻译事件，不反向依赖。
+3. domain 不许 include application/interface；infra 不许 include 任何 pi 层
+   （否则会成环——要 domain 类型的适配器一律放 `interface/adapter/`）。
 
 ## 三方库
 
-4. **不手搓**：JSON 用 `folly::dynamic`/`folly::json`；HTTP/SSE 用 proxygen；
-   异步运行时用 `folly::EventBase`；**日志用 quill**（`pi/log/Logging.h`，
-   stderr console + 文件每分钟滚动 × 30 备份 ≈ 保留 30 分钟）。
-   不引入 simdjson/nlohmann/curl 等替代品。
+4. **不手搓**：JSON 用 `folly::dynamic`/`folly::json`；HTTP 先走
+   `infra/http`（libcurl，macOS 系统库），proxygen 留给 SSE/并发；
+   **日志用 quill**（`infra/log/Logging.h`，stderr console +
+   文件每分钟滚动 × 30 备份 ≈ 保留 30 分钟）。
 5. **全部 vendor**：三方库一律进 `third_party/`（git clone/submodule/FetchContent），
-   **禁止 `brew install` 等全局安装**作为构建前置条件。当前已 vendor：
-   folly(子集)/fmt/glog/fast_float/boost-headers(按需)/quill。
+   **禁止 `brew install` 等全局安装**作为构建前置条件。
 6. **C++20**（folly 要求；trans-dsl-2 在 C++20 下已验证）。
 
 ## 架构
 
 7. **前后端分离**：前端复用 pi TS TUI，协议 = pi 的 NDJSON RPC（`rpc-types.ts`），
-   stdin 收 commands / stdout 出 responses+events。后端 socket 库不需要。
-   **stdout 只许出协议帧**——日志一律走 `pi/log`（console sink = stderr）。
+   stdin 收 commands / stdout 出 responses+events。
+   **stdout 只许出协议帧**——日志一律走 stderr。
 8. **DCI 三层**：role = 业务逻辑（具体类，单实现不劈接口）；context = 纯状态碎片；
    `XxxService` 只绑 role，`XxxContext` 继承碎片，`XxxImpl : XxxService, XxxContext`
    用 `IMPL_ROLE` 补 context 槽位。**不用 `IMPL_ROLE_WITH_VAR`**（impl IS-A context）。
-9. **异步统一走事件**：LLM/工具/DB 读写都 `WAIT_ON(EV_*)`，DB 不做事务外 flush。
-   `WAIT_ON` handler 不可捕获（`sizeof==1`），共享态经 `toRole`/`ROLE` 拿。
+   role/context/service/impl 全在 `domain/`。
+9. **领域规则回 domain**：不变式和判定（turn 是否结束、消息怎么构造、
+   增量怎么算）放聚合/领域服务（TurnPolicy、Session 的持久化游标、
+   StopReason）；role 只留编排和发事件；**action 永远是薄壳**。
+10. **异步统一走事件**：LLM/工具/DB 读写都 `WAIT_ON(EV_*)`，DB 不做事务外 flush。
+    `WAIT_ON` handler 不可捕获（`sizeof==1`），共享态经 `toRole`/`ROLE` 拿。
 
 ## trans-dsl 备忘
 
@@ -44,21 +55,24 @@
 
 ## 测试/覆盖率
 
-10. **集成测试用 gtest**（vendored `third_party/googletest`），粒度 =
+11. **集成测试用 gtest**（vendored `third_party/googletest`），粒度 =
     外部输入 NDJSON -> stdout 输出帧字段，进程级黑盒
-    （`tests/it/RpcHarness.h` spawn `cpp-pi --mode rpc`）。
-11. **用例对齐 pi 原仓库测试套件**：
+    （`tests/it/RpcHarness.h` spawn `cpp-pi --mode rpc --provider mock`）。
+    **测试必须密封**：spawn 一律带 `--provider mock`，不许打真网络。
+12. **用例对齐 pi 原仓库测试套件**：
     `rpc.test.ts` / `rpc-prompt-response-semantics.test.ts` / `rpc-jsonl.test.ts`
     的每条 case 在本仓 `tests/it/` 有对应 TEST。改协议行为先改测试。
-12. **覆盖率 ≥80% 行覆盖**（clang source-based coverage，只计 `src/`）：
-    `tools/coverage.sh` 出报告并做门禁。
+13. **覆盖率 ≥80% 行覆盖**（clang source-based coverage，只计 `src/`，
+    外部 IO 适配器 OpenAiProvider/HttpClient/CodexConfig 除外——
+    它们由真 LLM 冒烟覆盖）：`tools/coverage.sh` 出报告并做门禁。
 
 ## 构建/验证
 
 ```bash
 cmake -B build -DTDSL_ROOT=../trans-dsl-2 && cmake --build build
-./build/cpp-pi-it                     # 集成测试 (30 cases)
-./tools/coverage.sh                   # 覆盖率门禁 (当前 ~95% 行)
-printf 'x\n/q\n' | ./build/cpp-pi    # 冒烟: 应看到两轮 action #1/#2/#5 后退出
-printf '{"type":"prompt","message":"hi"}\n' | ./build/cpp-pi --mode rpc
+./build/cpp-pi-it                     # 集成测试 (30 cases, 全 mock 密封)
+./tools/coverage.sh                   # 覆盖率门禁 (当前 ~94% 行)
+printf 'x\n/q\n' | ./build/cpp-pi --provider mock   # 冒烟(离线)
+printf 'x\n/q\n' | ./build/cpp-pi    # 有 codex 凭证时打真模型
+printf '{"type":"prompt","message":"hi"}\n' | ./build/cpp-pi --mode rpc --provider mock
 ```

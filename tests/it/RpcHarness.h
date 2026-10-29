@@ -24,7 +24,9 @@ struct RpcHarness {
 
       { std::ofstream{in} << ndjsonInput; }
 
-      auto cmd = std::string{CPP_PI_BIN} + " --mode rpc < " + in + " > " + out + " 2>/dev/null";
+      auto cmd = std::string{CPP_PI_BIN}
+               + " --mode rpc --provider mock < " + in + " > " + out
+               + " 2>/dev/null";
       auto rc  = std::system(cmd.c_str());
       if (rc != 0) return {};
 

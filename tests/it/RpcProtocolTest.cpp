@@ -437,7 +437,7 @@ TEST(RpcMode, UnknownToolCallIsErrorResult) {
 TEST(RpcMode, CliModeProcessesQueue) {
    auto base = std::string{"/tmp/cpp-pi-it-cli-"} + std::to_string(::getpid());
    auto cmd  = std::string{"printf 'hello\\n/q\\n' | "} + CPP_PI_BIN
-             + " > " + base + ".out 2>/dev/null";
+             + " --provider mock > " + base + ".out 2>/dev/null";
    ASSERT_EQ(std::system(cmd.c_str()), 0);
 
    std::ifstream f{base + ".out"};

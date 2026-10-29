@@ -931,8 +931,8 @@ CMakeFiles/cpp-pi.dir/src/pi/domain/session/Session.cpp.o
  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/session/Session.h
  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/tool/Tool.h
 
-CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/cli/main.cpp
+CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/cli/main.cpp
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/Availability.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/AvailabilityInternal.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/AvailabilityInternalLegacy.h
@@ -976,6 +976,7 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_endian.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_limits.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_mcontext.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_param.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_types.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/arch.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/endian.h
@@ -1887,6 +1888,16 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/wchar.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/wctype.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/ctype.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/curl.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/curlver.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/easy.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/header.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/mprintf.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/multi.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/options.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/system.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/urlapi.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/websockets.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/errno.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/fcntl.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/gethostuuid.h
@@ -1963,6 +1974,7 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/mach_debug/ipc_info.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/_endian.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/_mcontext.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/_param.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/_types.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/endian.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/limits.h
@@ -1972,6 +1984,7 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/malloc/_malloc_type.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/malloc/_ptrcheck.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/math.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/net/net_kev.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/nl_types.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/os/base.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread.h
@@ -2033,6 +2046,7 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_int64_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_int8_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_intptr_t.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_iovec_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_key_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_mach_port_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_mbstate_t.h
@@ -2048,15 +2062,18 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_rsize_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_rune_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_s_ifmt.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_sa_family_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_seek_set.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_sigaltstack.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_sigset_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_size_t.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_socklen_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_ssize_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_suseconds_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_time_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_timespec.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_timeval.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_timeval64.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_u_char.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_u_int.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_u_int16_t.h
@@ -2074,6 +2091,7 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_wint_t.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/appleapiopts.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/cdefs.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/constrained_ctypes.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/errno.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/fcntl.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/file.h
@@ -2083,8 +2101,11 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/resource.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/select.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/signal.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/socket.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/stat.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/stdio.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/syslimits.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/time.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/types.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/unistd.h
  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/wait.h
@@ -2128,33 +2149,39 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
  /Library/Developer/CommandLineTools/usr/lib/clang/21/include/stdbool.h
  /Library/Developer/CommandLineTools/usr/lib/clang/21/include/stddef.h
  /Library/Developer/CommandLineTools/usr/lib/clang/21/include/stdint.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentSessionService.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentTurn.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentTurnImpl.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentTurnService.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/Events.h
  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/actions/ExecuteTools.h
  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/actions/PersistDelta.h
  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/actions/RequestCompletion.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/AgentTurnContext.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/EventQueueCtx.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/SessionCtx.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/TurnStateCtx.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/roles/Completer.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/roles/Persister.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/roles/ToolRunner.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/AgentTurnImpl.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/AgentTurnService.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/AgentTurnContext.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/EventQueueCtx.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/SessionCtx.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/TurnStateCtx.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/event/Events.h
  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/llm/Completion.h
  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/llm/ILlmProvider.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/llm/StopReason.h
  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/message/Message.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/role/Completer.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/role/Persister.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/role/ToolRunner.h
  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/session/ISessionStore.h
  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/session/Session.h
  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/tool/Tool.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/infrastructure/llm/MockLlmProvider.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/infrastructure/session/InMemorySessionStore.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/infrastructure/tools/LocalToolExecutor.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/log/Logging.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/rpc/JsonCodec.h
- /Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/rpc/RpcFrontend.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/turn/TurnPolicy.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/config/CodexConfig.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/http/HttpClient.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/log/Logging.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/process/Shell.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/llm/MockLlmProvider.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/llm/OpenAiProvider.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/session/InMemorySessionStore.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/tools/LocalToolExecutor.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/rpc/JsonCodec.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/rpc/RpcFrontend.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/trans/AgentSessionService.h
+ /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/trans/AgentTurn.h
  /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/arithmetic/dec.hpp
  /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/arithmetic/inc.hpp
  /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/arithmetic/limits/dec_256.hpp

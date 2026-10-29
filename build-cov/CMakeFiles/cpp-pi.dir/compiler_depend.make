@@ -930,7 +930,7 @@ CMakeFiles/cpp-pi.dir/src/pi/domain/session/Session.cpp.o: /Users/dongxu/Desktop
   /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/session/Session.h \
   /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/tool/Tool.h
 
-CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/cli/main.cpp \
+CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o: /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/cli/main.cpp \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/Availability.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/AvailabilityInternal.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/AvailabilityInternalLegacy.h \
@@ -974,6 +974,7 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_endian.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_limits.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_mcontext.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_param.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_types.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/arch.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/endian.h \
@@ -1885,6 +1886,16 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/wchar.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/wctype.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/ctype.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/curl.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/curlver.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/easy.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/header.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/mprintf.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/multi.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/options.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/system.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/urlapi.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/websockets.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/errno.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/fcntl.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/gethostuuid.h \
@@ -1961,6 +1972,7 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/mach_debug/ipc_info.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/_endian.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/_mcontext.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/_param.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/_types.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/endian.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/limits.h \
@@ -1970,6 +1982,7 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/malloc/_malloc_type.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/malloc/_ptrcheck.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/math.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/net/net_kev.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/nl_types.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/os/base.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread.h \
@@ -2031,6 +2044,7 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_int64_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_int8_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_intptr_t.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_iovec_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_key_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_mach_port_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_mbstate_t.h \
@@ -2046,15 +2060,18 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_rsize_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_rune_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_s_ifmt.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_sa_family_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_seek_set.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_sigaltstack.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_sigset_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_size_t.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_socklen_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_ssize_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_suseconds_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_time_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_timespec.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_timeval.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_timeval64.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_u_char.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_u_int.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_u_int16_t.h \
@@ -2072,6 +2089,7 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_wint_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/appleapiopts.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/cdefs.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/constrained_ctypes.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/errno.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/fcntl.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/file.h \
@@ -2081,8 +2099,11 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/resource.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/select.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/signal.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/socket.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/stat.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/stdio.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/syslimits.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/time.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/types.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/unistd.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/wait.h \
@@ -2126,33 +2147,39 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
   /Library/Developer/CommandLineTools/usr/lib/clang/21/include/stdbool.h \
   /Library/Developer/CommandLineTools/usr/lib/clang/21/include/stddef.h \
   /Library/Developer/CommandLineTools/usr/lib/clang/21/include/stdint.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentSessionService.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentTurn.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentTurnImpl.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentTurnService.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/Events.h \
   /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/actions/ExecuteTools.h \
   /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/actions/PersistDelta.h \
   /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/actions/RequestCompletion.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/AgentTurnContext.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/EventQueueCtx.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/SessionCtx.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/TurnStateCtx.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/roles/Completer.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/roles/Persister.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/roles/ToolRunner.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/AgentTurnImpl.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/AgentTurnService.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/AgentTurnContext.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/EventQueueCtx.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/SessionCtx.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/TurnStateCtx.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/event/Events.h \
   /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/llm/Completion.h \
   /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/llm/ILlmProvider.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/llm/StopReason.h \
   /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/message/Message.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/role/Completer.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/role/Persister.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/role/ToolRunner.h \
   /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/session/ISessionStore.h \
   /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/session/Session.h \
   /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/tool/Tool.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/infrastructure/llm/MockLlmProvider.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/infrastructure/session/InMemorySessionStore.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/infrastructure/tools/LocalToolExecutor.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/log/Logging.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/rpc/JsonCodec.h \
-  /Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/rpc/RpcFrontend.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/turn/TurnPolicy.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/config/CodexConfig.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/http/HttpClient.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/log/Logging.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/process/Shell.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/llm/MockLlmProvider.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/llm/OpenAiProvider.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/session/InMemorySessionStore.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/tools/LocalToolExecutor.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/rpc/JsonCodec.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/rpc/RpcFrontend.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/trans/AgentSessionService.h \
+  /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/trans/AgentTurn.h \
   /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/arithmetic/dec.hpp \
   /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/arithmetic/inc.hpp \
   /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/arithmetic/limits/dec_256.hpp \
@@ -2578,6 +2605,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Users/dongxu/Desktop/code/trans-dsl-2/include/cub/type-list/TypeListPipeLine.h:
 
+/Users/dongxu/Desktop/code/trans-dsl-2/include/cub/type-list/TypeListAccumulator.h:
+
 /Users/dongxu/Desktop/code/trans-dsl-2/include/cub/type-list/Flattenable.h:
 
 /Users/dongxu/Desktop/code/trans-dsl-2/include/cub/dci/Role.h:
@@ -2617,8 +2646,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Users/dongxu/Desktop/code/cpp-pi/third_party/quill/include/quill/core/FrontendOptions.h:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/quill/include/quill/core/Filesystem.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/third_party/quill/include/quill/core/DynamicFormatArgStore.h:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/quill/include/quill/core/Codec.h:
 
@@ -2708,10 +2735,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/container/Iterator.h:
 
-/Users/dongxu/Desktop/code/trans-dsl-2/include/trans-dsl/sched/domain/ThreadId.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/container/HeterogeneousAccess.h:
-
 /Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/container/HeterogeneousAccess-fwd.h:
 
 /Users/dongxu/Desktop/code/trans-dsl-2/include/trans-dsl/sched/concepts/ConceptHelper.h:
@@ -2738,6 +2761,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/Format-inl.h:
 
+/Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/Expected.h:
+
 /Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/Exception.h:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/fmt/include/fmt/format.h:
@@ -2754,8 +2779,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/tuple/size.hpp:
 
-/Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/tuple/limits/to_list_64.hpp:
-
 /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/tuple/elem.hpp:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/tuple/eat.hpp:
@@ -2767,10 +2790,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/repetition/limits/for_256.hpp:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/repetition/for.hpp:
-
-/Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/detail/Iterators.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/repetition/detail/for.hpp:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/logical/not.hpp:
 
@@ -2800,27 +2819,37 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/arithmetic/limits/inc_256.hpp:
 
+/Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/arithmetic/limits/dec_256.hpp:
+
 /Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/lang/Builtin.h:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/arithmetic/inc.hpp:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/arithmetic/dec.hpp:
 
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/rpc/JsonCodec.h:
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/tools/LocalToolExecutor.h:
 
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/log/Logging.h:
+/Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/tuple/limits/to_list_64.hpp:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/session/InMemorySessionStore.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/llm/OpenAiProvider.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/third_party/quill/include/quill/core/DynamicFormatArgStore.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/adapter/llm/MockLlmProvider.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/process/Shell.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/log/Logging.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/http/HttpClient.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/infra/config/CodexConfig.h:
 
 /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/session/ISessionStore.h:
 
-/Users/dongxu/Desktop/code/trans-dsl-2/include/cub/type-list/TypeListAccumulator.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/roles/Persister.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/Expected.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/EventQueueCtx.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/AgentTurnContext.h:
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/llm/StopReason.h:
 
 /Users/dongxu/Desktop/code/cpp-pi/src/pi/application/actions/RequestCompletion.h:
 
@@ -2838,13 +2867,21 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/xlocale/_inttypes.h:
 
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/socket.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/select.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/trans/AgentSessionService.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/file.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/fcntl.h:
 
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/constrained_ctypes.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_uuid_t.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_socklen_t.h:
 
 /Users/dongxu/Desktop/code/trans-dsl-2/include/trans-dsl/sched/domain/Unknown.h:
 
@@ -2861,6 +2898,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_fsid_t.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/signal.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/_param.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/mach/vm_sync.h:
 
@@ -2960,6 +2999,24 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/gethostuuid.h:
 
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/websockets.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/urlapi.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/system.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/options.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/multi.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/header.h:
+
+/Users/dongxu/Desktop/code/trans-dsl-2/include/trans-dsl/sched/domain/ThreadId.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/container/HeterogeneousAccess.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/easy.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/thread:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/stdbool.h:
@@ -2977,6 +3034,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/memory_resource:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/map:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_timeval64.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/iostream:
 
@@ -3047,8 +3106,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/elements_view.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/counted.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/roles/Completer.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/all.h:
 
@@ -3122,6 +3179,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/concepts.h:
 
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/AgentTurnImpl.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/space_info.h:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/variadic/limits/size_64.hpp:
@@ -3168,9 +3227,9 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/literals.h:
 
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/rpc/RpcFrontend.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/hh_mm_ss.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/EventQueueCtx.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/formatter.h:
 
@@ -3202,15 +3261,21 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/assert.h:
 
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/TurnStateCtx.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/arch.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_param.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_inttypes.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_assert.h:
 
-/Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/arithmetic/limits/dec_256.hpp:
+/Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/detail/Iterators.h:
 
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/cli/main.cpp:
+/Users/dongxu/Desktop/code/cpp-pi/third_party/boost-headers/boost/preprocessor/repetition/detail/for.hpp:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/cli/main.cpp:
 
 /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/session/Session.h:
 
@@ -3390,8 +3455,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_pthread/_pthread_key_t.h:
 
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentTurnImpl.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_pthread/_pthread_cond_t.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_posix_availability.h:
@@ -3414,13 +3477,13 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/runetype.h:
 
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/TurnStateCtx.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread/sched.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread/qos.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/math.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_sa_family_t.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__fwd/get.h:
 
@@ -3459,6 +3522,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Users/dongxu/Desktop/code/trans-dsl-2/include/cub/type-list/Tuple.h:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/json/json_pointer.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/curl.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/movable_box.h:
 
@@ -3547,6 +3612,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/mach/std_types.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/ctype.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/event/Events.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/errno.h:
 
@@ -3676,8 +3743,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/quill/include/quill/backend/BackendOptions.h:
 
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/infrastructure/tools/LocalToolExecutor.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_nth_element.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/allocator_destructor.h:
@@ -3687,8 +3752,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_rotate_copy.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_trivially_lexicographically_comparable.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentTurn.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/iterator.h:
 
@@ -3734,6 +3797,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/limits.h:
 
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/SessionCtx.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_equality_comparable.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_integral.h:
@@ -3756,8 +3821,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_convertible.h:
 
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/infrastructure/session/InMemorySessionStore.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/wchar.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/add_cv_quals.h:
@@ -3767,6 +3830,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__fwd/byte.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_compound.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/rpc/JsonCodec.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_base_of.h:
 
@@ -3858,6 +3923,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/aligned_storage.h:
 
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/role/Persister.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/generate.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/copy_cv.h:
@@ -3867,6 +3934,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__tuple/tuple_types.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__tuple/tuple_like_no_subrange.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/stat.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/forward.h:
 
@@ -4000,6 +4069,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__new/new_handler.h:
 
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/AgentTurnService.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/write_escaped.h:
 
 /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/message/Message.h:
@@ -4019,8 +4090,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/unique_temporary_buffer.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__mutex/lock_guard.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/Events.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/ranges:
 
@@ -4099,6 +4168,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/pair.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__math/copysign.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/time.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__log_hardening_failure:
 
@@ -4204,8 +4275,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__new/global_typed_new_delete.h:
 
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentSessionService.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/drop_view.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/move_iterator.h:
@@ -4235,6 +4304,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/distance.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/default_sentinel.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/net/net_kev.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_core_convertible.h:
 
@@ -4372,6 +4443,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__configuration/compiler.h:
 
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_iovec_t.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__exception/operations.h:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/hash/rapidhash.h:
@@ -4381,6 +4454,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__exception/exception_ptr.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_push_heap.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/role/ToolRunner.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__locale_dir/pad_and_output.h:
 
@@ -4458,6 +4533,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/Range.h:
 
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/mprintf.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/format_arg.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__config_site:
@@ -4500,8 +4577,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__compare/three_way_comparable.h:
 
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/roles/ToolRunner.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/iter_swap.h:
 
 /Users/dongxu/Desktop/code/trans-dsl-2/include/cub/base/Status.h:
@@ -4530,11 +4605,15 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/steady_clock.h:
 
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/turn/TurnPolicy.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/swap.h:
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/hash/Hash.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/malloc/_malloc_type.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/curlver.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/exchange.h:
 
@@ -4966,8 +5045,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Users/dongxu/Desktop/code/cpp-pi/third_party/folly/folly/Portability.h:
 
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/context/SessionCtx.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/pointer_traits.h:
 
 /Users/dongxu/Desktop/code/trans-dsl-2/include/trans-dsl/sched/helper/ThrowHelper.h:
@@ -5079,8 +5156,6 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_clamp.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__concepts/common_reference_with.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/infrastructure/llm/MockLlmProvider.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__math/gamma.h:
 
@@ -5221,6 +5296,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/make_projected.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_trivial.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/trans/AgentTurn.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/iterator_traits.h:
 
@@ -5582,13 +5659,13 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_limits.h:
 
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/role/Completer.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_assignable.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_blksize_t.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_ctermid.h:
-
-/Users/dongxu/Desktop/code/cpp-pi/src/pi/application/AgentTurnService.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_bounds.h:
 
@@ -5597,6 +5674,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/gps_clock.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/stdlib.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/context/AgentTurnContext.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_equal.h:
 
@@ -5607,6 +5686,8 @@ CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/mach/thread_act.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/shared_ptr.h:
+
+/Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/rpc/RpcFrontend.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/in_in_result.h:
 

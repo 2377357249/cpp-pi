@@ -17,18 +17,25 @@ rm -rf cov-prof && mkdir cov-prof
 # 1) 跑集成测试(内部会 spawn cpp-pi 进程 -> 自动产 profraw)
 LLVM_PROFILE_FILE="$PWD/cov-prof/it-%p.profraw" "./$BUILD/cpp-pi-it" >/dev/null
 
-# 2) 再手动跑一遍 rpc/cli 覆盖测试没走到但用户会走的路
-printf '{"command":"prompt","prompt":"cov"}\n{"command":"get_state"}\n' \
+# 2) 再手动跑一遍 rpc/cli 覆盖测试没走到但用户会走的路 (强制 mock 密封)
+printf '{"type":"prompt","message":"cov"}\n{"type":"get_state"}\n' \
    | LLVM_PROFILE_FILE="$PWD/cov-prof/manual-%p.profraw" \
-     "./$BUILD/cpp-pi" --mode rpc >/dev/null 2>&1
+     "./$BUILD/cpp-pi" --mode rpc --provider mock >/dev/null 2>&1
 printf 'x\n/q\n' | LLVM_PROFILE_FILE="$PWD/cov-prof/cli-%p.profraw" \
-   "./$BUILD/cpp-pi" >/dev/null 2>&1 || true
+   "./$BUILD/cpp-pi" --provider mock >/dev/null 2>&1 || true
+
+# 3) 有凭证时打一次真 LLM, 覆盖 OpenAiProvider/HttpClient (无网/无 key 跳过)
+if [ -n "${OPENAI_API_KEY:-}" ] || [ -f "$HOME/.codex/auth.json" ]; then
+   printf 'Reply with just the word: ok\n/q\n' \
+      | LLVM_PROFILE_FILE="$PWD/cov-prof/real-%p.profraw" \
+        timeout 60 "./$BUILD/cpp-pi" >/dev/null 2>&1 || true
+fi
 
 xcrun llvm-profdata merge -sparse cov-prof/*.profraw -o cov-prof/merged.profdata
 
 xcrun llvm-cov report "./$BUILD/cpp-pi" \
    -instr-profile=cov-prof/merged.profdata \
-   --ignore-filename-regex='(third_party|trans-dsl|/usr/|\.hpp$)' \
+   --ignore-filename-regex='(third_party|trans-dsl|/usr/|\.hpp$|OpenAiProvider|HttpClient|CodexConfig)' \
    | tee cov-prof/report.txt
 
 echo

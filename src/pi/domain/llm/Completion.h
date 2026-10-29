@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include <pi/domain/llm/StopReason.h>
 #include <pi/domain/message/Message.h>
 #include <pi/domain/tool/Tool.h>
 
@@ -15,8 +16,8 @@ struct CompletionRequest {
 };
 
 struct CompletionResult {
-   Message     message;     // assistant 消息, 可携带 toolCalls
-   std::string stopReason;  // "end_turn" | "tool_use" | ...
+   Message    message;     // assistant 消息, 可携带 toolCalls
+   StopReason stopReason;
 };
 
 } // namespace pi::domain

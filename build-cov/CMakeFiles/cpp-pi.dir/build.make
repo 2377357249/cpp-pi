@@ -86,30 +86,30 @@ CMakeFiles/cpp-pi.dir/src/pi/domain/session/Session.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/cpp-pi.dir/src/pi/domain/session/Session.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/dongxu/Desktop/code/cpp-pi/src/pi/domain/session/Session.cpp -o CMakeFiles/cpp-pi.dir/src/pi/domain/session/Session.cpp.s
 
-CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: CMakeFiles/cpp-pi.dir/flags.make
-CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: /Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/cli/main.cpp
-CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o: CMakeFiles/cpp-pi.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/dongxu/Desktop/code/cpp-pi/build-cov/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o -MF CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o.d -o CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o -c /Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/cli/main.cpp
+CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o: CMakeFiles/cpp-pi.dir/flags.make
+CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o: /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/cli/main.cpp
+CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o: CMakeFiles/cpp-pi.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/dongxu/Desktop/code/cpp-pi/build-cov/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o -MF CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o.d -o CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o -c /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/cli/main.cpp
 
-CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/cli/main.cpp > CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.i
+CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/cli/main.cpp > CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.i
 
-CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/dongxu/Desktop/code/cpp-pi/src/pi/presentation/cli/main.cpp -o CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.s
+CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/dongxu/Desktop/code/cpp-pi/src/pi/interface/cli/main.cpp -o CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.s
 
 # Object files for target cpp-pi
 cpp__pi_OBJECTS = \
 "CMakeFiles/cpp-pi.dir/src/pi/domain/session/Session.cpp.o" \
-"CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o"
+"CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o"
 
 # External object files for target cpp-pi
 cpp__pi_EXTERNAL_OBJECTS =
 
 cpp-pi: CMakeFiles/cpp-pi.dir/src/pi/domain/session/Session.cpp.o
-cpp-pi: CMakeFiles/cpp-pi.dir/src/pi/presentation/cli/main.cpp.o
+cpp-pi: CMakeFiles/cpp-pi.dir/src/pi/interface/cli/main.cpp.o
 cpp-pi: CMakeFiles/cpp-pi.dir/build.make
 cpp-pi: libtrans-dsl.a
 cpp-pi: libfolly_json.a

@@ -10,7 +10,7 @@
 
 ```
 ┌─────────────────────┐   stdin/stdout    ┌──────────────────────────┐
-│  pi TUI (TS, 不变)   │ ◄── NDJSON ────► │  cpp-pi backend (C++17)   │
+│  pi TUI (TS, 不变)   │ ◄── NDJSON ────► │  cpp-pi backend (C++20)   │
 │  或任意 RPC client   │   JSON lines     │  DDD + DCI + trans-dsl    │
 └─────────────────────┘                  └──────────────────────────┘
 ```
@@ -20,28 +20,31 @@
   responses + streaming events 从 stdout 出。**后端兼容该协议 ⇒ 现有 TUI 零改动接入**。
 - 后端二进制即 `cpp-pi`，`cpp-pi --mode rpc` 作为被前端拉起的子进程（与 `pi rpc` 相同用法）。
 
-## 2. DDD 四层（依赖只许向下指：底层依赖高层，高层不感知底层）
-
-```
-presentation ─► application ─► domain
-                    ▲             ▲
-                    └── infrastructure ┘   (实现 domain/app 定义的端口)
-```
+## 2. 四层（依赖只许向下指：`interface → application → domain → infra`）
 
 | 层 | 内容 | 禁止依赖 |
 |---|---|---|
-| `domain/` | Message/ToolCall/Tool/Completion/Model 值对象; **Session 聚合根**(append-only 消息历史); 端口 `ILlmProvider` `IToolExecutor` `ISessionStore` | 一切（纯 C++） |
-| `application/` | trans-dsl 事务与 action、context 碎片、role、service/impl、协议事件、RPC 命令分发 | infra、presentation |
-| `infrastructure/` | 端口实现：HTTP LLM provider、本地工具执行器、JSONL store、MCP client | —（最底层） |
-| `presentation/` | RPC 前端（NDJSON ↔ 协议事件）；CLI REPL | infra 具体类 |
+| `interface/` (pi::iface) | 对外消息：`rpc/` NDJSON 协议端、`cli/`；DSL 编排的事务 `trans/`（AgentTurn、SessionLoop、驱动服务）；**出向外部协议的适配器** `adapter/`（LLM provider、工具执行器、session store——它们是"对外的消息"的另一半） | — |
+| `application/` (pi::app) | **只放 trans-dsl action**（薄壳：exec/handleEvent 转发到 role） | interface |
+| `domain/` (pi::domain) | **业务逻辑所在地**：role（domain/role/）+ context 碎片（domain/context/）+ Service/Impl 合流 + 聚合/值对象/领域服务/端口/协议事件 | application、interface |
+| `infra/` (pi::infra) | 全层可用的技术设施：log(quill)/http(libcurl)/process(shell)/config(codex 凭证) | **任何 pi 层**（最底，不能回指，否则成环） |
 
-**端口全部回调式签名**（`complete(req, std::function cb)`）：infra 实现不感知"事件"存在，事件翻译由注入回调完成——infra 连 `Events.h` 都不 include。
+关键判据：**infra 不认识 domain 类型**——所以实现 domain 端口的适配器不住 infra，住 `interface/adapter/`（端口实现在"对外消息"层，与 rpc/cli 同层不同侧）。
+
+**端口全部回调式签名**（`complete(req, std::function cb)`）：适配器不感知"事件"存在，事件翻译由注入回调完成——适配器连 `Events.h` 都不 include。
 
 ## 3. 两种"事件"，各归各位
 
-- **协议事件**（application/Events.h）：事务对外的响应契约。`EV_LLM_DONE` `EV_TOOLS_DONE` `EV_STORE_DONE` `EV_LOAD_DONE` `EV_USER_INPUT` `EV_ABORT`。只有应用层知道 ID。
-- **传输事件**（infrastructure 内部）：SSE chunk、fd 就绪、stdin 行。infra 内部消化后经回调翻译为协议事件。
+- **协议事件**（domain/event/Events.h）：事务对外的响应契约。`EV_LLM_DONE` `EV_TOOLS_DONE` `EV_STORE_DONE` `EV_LOAD_DONE` `EV_USER_INPUT` `EV_ABORT`。
+- **传输事件**（infra 内部）：SSE chunk、fd 就绪、stdin 行。infra 内部消化后经回调翻译为协议事件。
 - 领域事件（`TurnCompleted` 等，给审计/遥测）以后再加，归 domain。
+
+## 3.5 领域规则回 domain（不漂在 role/action 里）
+
+- `domain/turn/TurnPolicy.h`：turn 是否结束/要不要工具 的统一判定。
+- `Session` 聚合自带**持久化游标**：`beginTurn()`/`unpersisted()`/`markPersisted()`——增量记账不再手工放 context。
+- `domain/llm/StopReason.h`：领域枚举 + `toWire()`（"stop"/"toolUse"/"error"），codec 只调它。
+- role 只留编排 + 发事件；构造 Message 一律走 Session 工厂方法。
 
 ## 4. DCI 三层组合（每个 proc 一套三元组）
 
@@ -106,24 +109,25 @@ ToolCalls = __procedure( PermissionGate → ExecTool → Report );
 
 ## 7. RPC 边界（前后端协议适配层）
 
-- `presentation/rpc/`：stdin 行 → `RpcCommand` → 应用服务命令（prompt→`EV_USER_INPUT` 喂事务；abort→`EV_ABORT`/`stop()`）；事务监听器/context 状态 → streaming events 行。
+- `interface/rpc/`：stdin 行 → `RpcCommand` → 服务命令（prompt→runTurn；abort→`EV_ABORT`/`stop()` 待接）；新增消息 → pi AgentEvent 形状的 streaming 行。
 - 命令面照抄 `rpc-types.ts` 全集（见第 8 节迁移表），响应/event 字段与其对齐 ⇒ TS 前端零改动。
-- JSON 解析：nlohmann/json（单头）。
+- JSON：`folly::dynamic`/`folly::json`（vendored 子集）。
 
 ## 8. pi → cpp-pi 功能迁移路线
 
 | pi package/特性 | cpp-pi 落点 | 优先级 |
 |---|---|---|
-| `agent` agent-loop | `AgentTurn` proc + context/roles | P0 骨架已立 |
-| `coding-agent` RPC mode | `presentation/rpc` NDJSON 协议 | P0 前端接入前提 |
-| 内置工具 read/bash/edit/write | `infra/tools` + `ToolCalls` proc | P1 |
-| `ai` 各 provider(anthropic/openai/…) | `infra/llm/*Provider`（HTTP+SSE） | P1 |
-| session 持久化/fork | `ISessionStore`+JSONL, `fork` 命令 | P1 |
+| `agent` agent-loop | `interface/trans/AgentTurn` proc + domain roles | P0 骨架已立 |
+| `coding-agent` RPC mode | `interface/rpc` NDJSON 协议 | P0 已对齐(30 IT) |
+| LLM provider (openai/responses) | `interface/adapter/llm/OpenAiProvider` + `infra/http` | P0 已通真模型 |
+| 内置工具 read/bash/edit/write | `interface/adapter/tools` + `ToolCalls` proc | P1 |
+| `ai` 各 provider(anthropic/openai/…) | `interface/adapter/llm/*Provider`（HTTP+SSE） | P1 |
+| session 持久化/fork | `ISessionStore`+JSONL adapter, `fork` 命令 | P1 |
 | compaction | `Compact` proc | P2 |
 | OAuth/API key 登录 | `Auth` proc + `ICredentialStore` | P2 |
 | permission/approval | `PermissionGate` proc + `EV_PERMISSION_RSP` | P2 |
-| MCP | `infra/mcp` client | P3 |
-| skills/extensions/slash-commands | application 资源加载 | P3 |
+| MCP | `interface/adapter/mcp` client | P3 |
+| skills/extensions/slash-commands | domain/application 资源加载 | P3 |
 | `tui` | **不迁移——前端保持 TS 版不变** | — |
 | `durable` | `JournalCtx` 事件重放 | P4 |
 | telemetry | 监听器体系 | P4 |
@@ -139,10 +143,11 @@ ToolCalls = __procedure( PermissionGate → ExecTool → Report );
 | fast_float | `third_party/fast_float` | folly Conv 浮点解析（libc++ 无 float from_chars） |
 | boost-headers(按需子集) | `third_party/boost-headers` | folly 头文件闭包（~38MB, 非全量 179MB） |
 | quill | `third_party/quill` | 异步日志: stderr console + 文件每分钟滚动×30 备份 ≈ 保留 30 分钟 |
-| **proxygen** | 待 vendor | HTTPS+SSE（LLM provider 适配器） |
+| libcurl | macOS 系统库（非 brew） | `infra/http` 当前 HTTP 后端 |
+| **proxygen** | 待 vendor | HTTPS+SSE 流式/并发，替换 libcurl |
 
 - 前端协议走 stdin/stdout NDJSON，**不需要 socket 库**。
-- 网络只服务于 LLM provider / MCP——全部关在 infra 适配器内。
+- 网络只服务于 LLM provider / MCP——HTTP 细节关在 `infra/http`，domain 协议细节关在 `interface/adapter`。
 - `folly-config/folly/folly-config.h` 是手写的 macOS 静态配置（对应 folly 的 cmake 模板，裁剪到最小面）。
 - **禁止 `brew install` 作为构建前置**（见 AGENTS.md）。
 
