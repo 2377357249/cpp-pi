@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <vector>
 
+#include <folly/json/json.h>
+
 #include <pi/domain/tool/Tool.h>
 
 namespace pi::infra {
@@ -16,11 +18,11 @@ class LocalToolExecutor : public domain::IToolExecutor {
 public:
    void execute(domain::ToolCall const& call, domain::ToolResultHandler done) override {
       if (call.tool == "echo") {
-         done({call.id, "echo", "echo: " + call.input, false});
+         done({call.id, "echo", "echo: " + jsonArg(call.input, "input"), false});
          return;
       }
       if (call.tool == "bash") {
-         done({call.id, "bash", runBash(call.input), false});
+         done({call.id, "bash", runBash(jsonArg(call.input, "command")), false});
          return;
       }
       done({call.id, call.tool, "unknown tool: " + call.tool, true});
@@ -36,7 +38,17 @@ public:
    }
 
 private:
-   // input 即 shell 命令串(骨架: 不入参 JSON 解析). 截断到 8KB.
+   // 工具入参是 JSON 串: 取 field 字段; 解不出就原样用 (模型可能给裸串).
+   static auto jsonArg(std::string const& input, std::string const& field)
+      -> std::string {
+      try {
+         auto j = folly::parseJson(input);
+         if (j.count(field) && j[field].isString()) return j[field].getString();
+      } catch (...) {}
+      return input;
+   }
+
+   // 截断到 8KB.
    static auto runBash(std::string const& cmd) -> std::string {
       std::string out;
       std::array<char, 4096> buf{};
