@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cstdio>
-
 #include <trans-dsl/trans-dsl.h>
 #include <trans-dsl/action/TransactionInfo.h>
+
+#include <pi/log/Logging.h>
 
 #include <pi/application/AgentTurnImpl.h>
 #include <pi/application/actions/ExecuteTools.h>
@@ -45,10 +45,12 @@ using AgentTurn = __transaction
 // ---------------------------------------------------------------------------
 struct TurnObserver : TSL_NS::ObservedActionIdRegistry<1, 2, 5> {
    auto onActionStarting(TSL_NS::ActionId aid, TSL_NS::TransactionInfo const&) -> void {
-      std::printf("    >> turn: action #%u starting\n", aid);
+      if (auto* lg = pi::log::logger())
+         LOG_INFO(lg, "turn: action #{} starting", aid);
    }
    auto onActionDone(TSL_NS::ActionId aid, TSL_NS::TransactionInfo const&, TSL_NS::Status st) -> void {
-      std::printf("    >> turn: action #%u done, status=%u\n", aid, st);
+      if (auto* lg = pi::log::logger())
+         LOG_INFO(lg, "turn: action #{} done, status={}", aid, st);
    }
 };
 

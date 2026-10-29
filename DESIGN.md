@@ -128,16 +128,23 @@ ToolCalls = __procedure( PermissionGate → ExecTool → Report );
 | `durable` | `JournalCtx` 事件重放 | P4 |
 | telemetry | 监听器体系 | P4 |
 
-## 9. 三方依赖（不手搓）
+## 9. 三方依赖（不手搓, 全部 vendor 进 third_party/）
 
-| 依赖 | 用途 |
-|---|---|
-| **trans-dsl-2** | 事务 DSL（本地源码，`-DTDSL_ROOT`，默认 `../trans-dsl-2`） |
-| **folly** | `dynamic`/`json`（JSON）、`EventBase`（infra 异步运行时）、`Synchronized`（跨线程向事件队列投递） |
-| **proxygen** | HTTPS client + SSE 流式（LLM provider 适配器；长在 folly 上的 Meta HTTP 栈） |
+| 依赖 | 位置 | 用途 |
+|---|---|---|
+| **trans-dsl-2** | `../trans-dsl-2`（兄弟目录, `-DTDSL_ROOT` 覆盖） | 事务 DSL |
+| **folly**(子集) | `third_party/folly` + `third_party/folly-config` | `dynamic`/`json`；后续 EventBase/Synchronized |
+| fmt | `third_party/fmt` | folly 依赖 |
+| glog | `third_party/glog` | folly 依赖 |
+| fast_float | `third_party/fast_float` | folly Conv 浮点解析（libc++ 无 float from_chars） |
+| boost-headers(按需子集) | `third_party/boost-headers` | folly 头文件闭包（~38MB, 非全量 179MB） |
+| quill | `third_party/quill` | 异步日志: stderr console + 文件每分钟滚动×30 备份 ≈ 保留 30 分钟 |
+| **proxygen** | 待 vendor | HTTPS+SSE（LLM provider 适配器） |
 
 - 前端协议走 stdin/stdout NDJSON，**不需要 socket 库**。
 - 网络只服务于 LLM provider / MCP——全部关在 infra 适配器内。
+- `folly-config/folly/folly-config.h` 是手写的 macOS 静态配置（对应 folly 的 cmake 模板，裁剪到最小面）。
+- **禁止 `brew install` 作为构建前置**（见 AGENTS.md）。
 
 ## 10. 构建
 
@@ -147,4 +154,4 @@ cmake -B build -DTDSL_ROOT=/path/to/trans-dsl-2 && cmake --build build
 ./build/cpp-pi --mode rpc # RPC 后端 (前端接入)
 ```
 
-C++17（trans-dsl-2 的基准）。
+C++20（folly 要求 C++20；trans-dsl-2 在 C++20 下编译验证通过）。
