@@ -42,6 +42,7 @@ add_library(folly_json STATIC
    third_party/folly/folly/ScopeGuard.cpp
    third_party/folly/folly/lang/SafeAssert.cpp
    third_party/folly/folly/lang/ToAscii.cpp
+   third_party/folly/folly/lang/Exception.cpp
    third_party/folly/folly/json/json_pointer.cpp
    third_party/folly/folly/container/detail/F14Table.cpp
    third_party/folly/folly/hash/SpookyHashV2.cpp)
@@ -54,6 +55,8 @@ target_link_libraries(folly_json PUBLIC fmt::fmt glog::glog)
 
 add_subdirectory(third_party/quill)
 
+option(CPP_PI_COVERAGE "clang 源码级覆盖率插桩" OFF)
+
 # ---------------------------------------------------------------------------
 # cpp-pi
 # ---------------------------------------------------------------------------
@@ -61,3 +64,24 @@ file(GLOB_RECURSE CPP_PI_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/
 add_executable(cpp-pi ${CPP_PI_SOURCES})
 target_include_directories(cpp-pi PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(cpp-pi PRIVATE trans-dsl folly_json quill)
+
+if(CPP_PI_COVERAGE)
+   target_compile_options(cpp-pi PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+   target_link_options(cpp-pi PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+endif()
+
+# ---------------------------------------------------------------------------
+# 集成测试 (gtest): 粒度 = 外部输入 NDJSON -> 断言输出 NDJSON 字段
+# ---------------------------------------------------------------------------
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/googletest)
+enable_testing()
+
+file(GLOB_RECURSE CPP_PI_IT_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
+add_executable(cpp-pi-it ${CPP_PI_IT_SOURCES})
+target_link_libraries(cpp-pi-it PRIVATE GTest::gtest_main folly_json)
+target_compile_definitions(cpp-pi-it PRIVATE
+   CPP_PI_BIN="$<TARGET_FILE:cpp-pi>")
+add_dependencies(cpp-pi-it cpp-pi)
+
+add_test(NAME integration COMMAND cpp-pi-it)

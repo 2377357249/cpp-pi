@@ -39,8 +39,8 @@ struct ToolRunner {
    auto settle() -> void {
       auto& turn = ROLE(TurnStateCtx);
       for (auto const& r : turn.pendingToolResults) {
-         turn.deltaMessages.push_back(
-            domain::Message{domain::Role::Tool, r.content, {}, r.toolCallId});
+         turn.deltaMessages.push_back(domain::Message{
+            domain::Role::Tool, r.content, {}, r.toolCallId, r.toolName, r.isError});
       }
       ROLE(SessionCtx).session.appendToolResults(turn.pendingToolResults);
    }

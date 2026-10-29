@@ -22,6 +22,9 @@ public:
    auto appendAssistant(Message msg) -> void;
    auto appendToolResults(std::vector<ToolResult> const& results) -> void;
 
+   // new_session 边界: 清空历史(聚合生命周期操作, 非消息操作)
+   auto reset() -> void { history_.clear(); }
+
    auto messages() const -> std::vector<Message> const& { return history_; }
    auto id() const -> Id const& { return id_; }
 

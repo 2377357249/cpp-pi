@@ -21,10 +21,14 @@ public:
          return;
       }
       auto const& input = req.messages.empty() ? std::string{} : req.messages.back().text;
+      // 前缀路由不同工具路径: "bash:<cmd>" / "unknown:<x>" / 默认 echo
+      std::string tool = "echo", arg = input;
+      if (input.rfind("bash:", 0) == 0)    { tool = "bash";    arg = input.substr(5); }
+      if (input.rfind("unknown:", 0) == 0) { tool = "no_such"; arg = input.substr(8); }
       done(domain::CompletionResult{
          domain::Message{domain::Role::Assistant,
-                         "我需要先调用 echo 工具",
-                         {domain::ToolCall{"call-1", "echo", input}}, {}},
+                         "我需要先调用 " + tool + " 工具",
+                         {domain::ToolCall{"call-1", tool, arg}}, {}},
          "tool_use"});
    }
 };

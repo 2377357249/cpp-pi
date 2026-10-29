@@ -20,6 +20,8 @@ struct Message {
    std::string           text;
    std::vector<ToolCall> toolCalls;
    std::string           toolCallId;  // role == Tool 时, 对应的调用 id
+   std::string           toolName;    // role == Tool 时, 工具名
+   bool                  isError = false;  // role == Tool 时, 执行是否出错
 };
 
 } // namespace pi::domain

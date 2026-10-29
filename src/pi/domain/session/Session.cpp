@@ -13,7 +13,8 @@ auto Session::appendAssistant(Message msg) -> void {
 
 auto Session::appendToolResults(std::vector<ToolResult> const& results) -> void {
    for (auto const& r : results) {
-      history_.push_back(Message{Role::Tool, r.content, {}, r.toolCallId});
+      history_.push_back(
+         Message{Role::Tool, r.content, {}, r.toolCallId, r.toolName, r.isError});
    }
 }
 

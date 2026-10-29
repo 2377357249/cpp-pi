@@ -18,6 +18,7 @@ struct Tool {
 // 一次工具执行的结果
 struct ToolResult {
    std::string toolCallId;
+   std::string toolName;
    std::string content;
    bool        isError = false;
 };

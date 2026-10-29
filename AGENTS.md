@@ -42,9 +42,23 @@
   聚合 action：内部逐个发起、计数收齐后 post 单个事件。
 - `settle` 类操作不要 `std::move` 事务中间态——谓词可能还要读。
 
+## 测试/覆盖率
+
+10. **集成测试用 gtest**（vendored `third_party/googletest`），粒度 =
+    外部输入 NDJSON -> stdout 输出帧字段，进程级黑盒
+    （`tests/it/RpcHarness.h` spawn `cpp-pi --mode rpc`）。
+11. **用例对齐 pi 原仓库测试套件**：
+    `rpc.test.ts` / `rpc-prompt-response-semantics.test.ts` / `rpc-jsonl.test.ts`
+    的每条 case 在本仓 `tests/it/` 有对应 TEST。改协议行为先改测试。
+12. **覆盖率 ≥80% 行覆盖**（clang source-based coverage，只计 `src/`）：
+    `tools/coverage.sh` 出报告并做门禁。
+
 ## 构建/验证
 
 ```bash
 cmake -B build -DTDSL_ROOT=../trans-dsl-2 && cmake --build build
-printf 'x\n/q\n' | ./build/cpp-pi   # 冒烟: 应看到两轮 action #1/#2/#5 后退出
+./build/cpp-pi-it                     # 集成测试 (30 cases)
+./tools/coverage.sh                   # 覆盖率门禁 (当前 ~95% 行)
+printf 'x\n/q\n' | ./build/cpp-pi    # 冒烟: 应看到两轮 action #1/#2/#5 后退出
+printf '{"type":"prompt","message":"hi"}\n' | ./build/cpp-pi --mode rpc
 ```

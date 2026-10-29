@@ -25,8 +25,12 @@ inline quill::Logger* init(std::string const& logDir = "logs") {
 
    std::filesystem::create_directories(logDir);
 
+   quill::ConsoleSinkConfig consoleCfg;
+   consoleCfg.set_stream("stderr");
+
    std::vector<std::shared_ptr<quill::Sink>> sinks;
-   sinks.push_back(quill::Frontend::create_or_get_sink<quill::ConsoleSink>("stderr"));
+   sinks.push_back(quill::Frontend::create_or_get_sink<quill::ConsoleSink>(
+      "console", consoleCfg));
 
    quill::RotatingFileSinkConfig cfg;
    cfg.set_open_mode('a');
