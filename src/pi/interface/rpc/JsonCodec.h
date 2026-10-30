@@ -314,8 +314,192 @@ namespace detail {
    inline auto intOr(folly::dynamic const& j, char const* k, int64_t def = 0)
       -> int64_t {
       auto it = j.find(k);
-      return it != j.items().end() && it->second.isInt()
-                ? it->second.getInt() : def;
+      return it != j.items().end() && it->second.isNumber()
+                ? static_cast<int64_t>(it->second.asDouble()) : def;
+   }
+
+   // usageToJson 的镜像
+   inline auto usageFromJson(folly::dynamic const& j) -> domain::Usage {
+      domain::Usage u;
+      if (!j.isObject()) return u;
+      u.input       = intOr(j, "input");
+      u.output      = intOr(j, "output");
+      u.cacheRead   = intOr(j, "cacheRead");
+      u.cacheWrite  = intOr(j, "cacheWrite");
+      u.totalTokens = intOr(j, "totalTokens");
+      if (j.count("reasoning") && j.at("reasoning").isNumber())
+         u.reasoning = intOr(j, "reasoning");
+      if (j.count("cacheWrite1h") && j.at("cacheWrite1h").isNumber())
+         u.cacheWrite1h = intOr(j, "cacheWrite1h");
+      if (auto c = j.find("cost"); c != j.items().end() && c->second.isObject()) {
+         u.cost.input      = c->second.count("input")
+            ? c->second.at("input").asDouble() : 0;
+         u.cost.output     = c->second.count("output")
+            ? c->second.at("output").asDouble() : 0;
+         u.cost.cacheRead  = c->second.count("cacheRead")
+            ? c->second.at("cacheRead").asDouble() : 0;
+         u.cost.cacheWrite = c->second.count("cacheWrite")
+            ? c->second.at("cacheWrite").asDouble() : 0;
+         u.cost.total      = c->second.count("total")
+            ? c->second.at("total").asDouble() : 0;
+         u.cost.totalFromProvider =
+            c->second.count("totalFromProvider")
+            && c->second.at("totalFromProvider").isBool()
+            && c->second.at("totalFromProvider").getBool();
+      }
+      return u;
+   }
+
+   // content 数组块 -> Message.text/images (pi 拍平约定 "\n" 分隔)
+   inline void flattenContent(folly::dynamic const& content,
+                              domain::Message& m) {
+      std::string text;
+      auto appendText = [&text](std::string_view t) {
+         if (!text.empty()) text += '\n';
+         text += t;
+      };
+      for (auto const& b : content) {
+         if (!b.isObject()) continue;
+         auto const bt = strOr(b, "type");
+         if (bt == "text") {
+            appendText(strOr(b, "text"));
+            if (b.count("textSignature") && b.at("textSignature").isString())
+               m.textSignature = b.at("textSignature").getString();
+         } else if (bt == "image") {
+            m.images.push_back(
+               domain::ImageData{strOr(b, "data"), strOr(b, "mimeType")});
+         }
+      }
+      m.text = std::move(text);
+   }
+
+   // assistant content 数组 -> thinking/text/toolCalls (按角色专用)
+   inline void assistantBlocks(folly::dynamic const& content,
+                               domain::Message& m) {
+      std::string text;
+      auto appendText = [&text](std::string_view t) {
+         if (!text.empty()) text += '\n';
+         text += t;
+      };
+      for (auto const& b : content) {
+         if (!b.isObject()) continue;
+         auto const bt = strOr(b, "type");
+         if (bt == "thinking") {
+            m.thinking.push_back(domain::ThinkingBlock{
+               strOr(b, "thinking"), strOr(b, "thinkingSignature"),
+               boolOr(b, "redacted")});
+         } else if (bt == "text") {
+            appendText(strOr(b, "text"));
+            if (b.count("textSignature") && b.at("textSignature").isString())
+               m.textSignature = b.at("textSignature").getString();
+         } else if (bt == "toolCall") {
+            domain::ToolCall tc;
+            tc.id   = strOr(b, "id");
+            tc.tool = strOr(b, "name");
+            tc.argumentsError = strOr(b, "argumentsError");
+            if (auto a = b.find("arguments");
+                a != b.items().end() && a->second.isObject())
+               tc.input = folly::toJson(a->second);
+            tc.thoughtSignature = strOr(b, "thoughtSignature");
+            tc.ns               = strOr(b, "namespace");
+            m.toolCalls.push_back(std::move(tc));
+         }
+      }
+      m.text = std::move(text);
+   }
+
+   inline void jsonField(folly::dynamic const& j, char const* k,
+                         std::string& out) {
+      if (auto it = j.find(k); it != j.items().end() && !it->second.isNull())
+         out = folly::toJson(it->second);
+   }
+
+   // messageToJson 的镜像: 按角色还原全部嵌套字段.
+   inline auto messageFromJson(folly::dynamic const& mj)
+      -> std::optional<domain::Message> {
+      if (!mj.isObject()) return std::nullopt;
+      domain::Message m;
+      auto const role = strOr(mj, "role", "user");
+      if      (role == "user")              m.role = domain::Role::User;
+      else if (role == "assistant")         m.role = domain::Role::Assistant;
+      else if (role == "toolResult")        m.role = domain::Role::Tool;
+      else if (role == "system")            m.role = domain::Role::System;
+      else if (role == "bashExecution")     m.role = domain::Role::BashExecution;
+      else if (role == "custom")            m.role = domain::Role::Custom;
+      else if (role == "branchSummary")     m.role = domain::Role::BranchSummary;
+      else if (role == "compactionSummary") m.role = domain::Role::CompactionSummary;
+      else return std::nullopt;
+
+      m.timestampMs = intOr(mj, "timestamp");
+      m.durationMs  = intOr(mj, "durationMs", -1);
+      auto content = mj.find("content");
+
+      switch (m.role) {
+      case domain::Role::User:
+         if (content != mj.items().end()) {
+            if (content->second.isString())    m.text = content->second.getString();
+            else if (content->second.isArray()) flattenContent(content->second, m);
+         }
+         break;
+      case domain::Role::Tool:
+         m.toolCallId = strOr(mj, "toolCallId");
+         m.toolName   = strOr(mj, "toolName");
+         m.isError    = boolOr(mj, "isError");
+         jsonField(mj, "details", m.detailsJson);
+         if (content != mj.items().end() && content->second.isArray())
+            flattenContent(content->second, m);
+         break;
+      case domain::Role::System:
+         if (content != mj.items().end() && content->second.isString())
+            m.text = content->second.getString();
+         break;
+      case domain::Role::Assistant:
+         m.api           = strOr(mj, "api");
+         m.provider      = strOr(mj, "provider");
+         m.model         = strOr(mj, "model");
+         m.responseModel = strOr(mj, "responseModel");
+         m.responseId    = strOr(mj, "responseId");
+         m.errorMessage  = strOr(mj, "errorMessage");
+         if (mj.count("endTurn") && mj.at("endTurn").isBool()) {
+            m.hasEndTurn = true;
+            m.endTurn    = mj.at("endTurn").getBool();
+         }
+         if (auto u = mj.find("usage"); u != mj.items().end())
+            m.usage = usageFromJson(u->second);
+         if (mj.count("stopReason") && mj.at("stopReason").isString())
+            m.stopReason = domain::stopReasonFromWire(
+               mj.at("stopReason").getString());
+         if (content != mj.items().end() && content->second.isArray())
+            assistantBlocks(content->second, m);
+         else if (content != mj.items().end() && content->second.isString())
+            m.text = content->second.getString();
+         break;
+      case domain::Role::BashExecution:
+         m.command            = strOr(mj, "command");
+         m.cancelled          = boolOr(mj, "cancelled");
+         m.truncated          = boolOr(mj, "truncated");
+         m.exitCode           = intOr(mj, "exitCode", -9999);
+         m.fullOutputPath     = strOr(mj, "fullOutputPath");
+         m.excludeFromContext = boolOr(mj, "excludeFromContext");
+         if (mj.count("output") && mj.at("output").isString())
+            m.text = mj.at("output").getString();
+         break;
+      case domain::Role::Custom:
+         m.customType = strOr(mj, "customType");
+         m.display    = boolOr(mj, "display");
+         jsonField(mj, "content", m.contentJson);
+         jsonField(mj, "details", m.detailsJson);
+         break;
+      case domain::Role::BranchSummary:
+         m.summary = strOr(mj, "summary");
+         m.fromId  = strOr(mj, "fromId");
+         break;
+      case domain::Role::CompactionSummary:
+         m.summary      = strOr(mj, "summary");
+         m.tokensBefore = intOr(mj, "tokensBefore", -1);
+         break;
+      }
+      return m;
    }
 } // namespace detail
 
@@ -334,29 +518,10 @@ inline auto entryFromJson(folly::dynamic const& j) -> std::optional<domain::Entr
 
    if (type == "message") {
       auto it = j.find("message");
-      if (it == j.items().end() || !it->second.isObject()) return std::nullopt;
-      auto const& mj = it->second;
-      domain::Message m;
-      if (auto c = mj.find("content"); c != mj.items().end()) {
-         if (c->second.isString())    m.text = c->second.getString();
-         else if (c->second.isArray())
-            m.text = folly::toJson(c->second);   // 块内容原样回灌
-      }
-      auto const role = detail::strOr(mj, "role", "user");
-      if      (role == "user")              m.role = domain::Role::User;
-      else if (role == "assistant")         m.role = domain::Role::Assistant;
-      else if (role == "toolResult")        m.role = domain::Role::Tool;
-      else if (role == "system")            m.role = domain::Role::System;
-      else if (role == "bashExecution")     m.role = domain::Role::BashExecution;
-      else if (role == "custom")            m.role = domain::Role::Custom;
-      else if (role == "branchSummary")     m.role = domain::Role::BranchSummary;
-      else if (role == "compactionSummary") m.role = domain::Role::CompactionSummary;
-      else return std::nullopt;
-      m.toolCallId  = detail::strOr(mj, "toolCallId");
-      m.toolName    = detail::strOr(mj, "toolName");
-      m.isError     = detail::boolOr(mj, "isError");
-      m.timestampMs = detail::intOr(mj, "timestamp");
-      e.payload = domain::MessageEntry{std::move(m)};
+      if (it == j.items().end()) return std::nullopt;
+      auto m = detail::messageFromJson(it->second);
+      if (!m) return std::nullopt;
+      e.payload = domain::MessageEntry{std::move(*m)};
    } else if (type == "thinking_level_change") {
       e.payload = domain::ThinkingLevelEntry{
          detail::strOr(j, "thinkingLevel")};
@@ -364,21 +529,49 @@ inline auto entryFromJson(folly::dynamic const& j) -> std::optional<domain::Entr
       e.payload = domain::ModelChangeEntry{
          detail::strOr(j, "provider"), detail::strOr(j, "modelId")};
    } else if (type == "usage") {
-      e.payload = domain::UsageRecordEntry{
-         detail::strOr(j, "kind"), detail::strOr(j, "provider"),
-         detail::strOr(j, "model"), domain::Usage{},
-         detail::strOr(j, "note")};
+      domain::UsageRecordEntry p;
+      p.kind     = detail::strOr(j, "kind");
+      p.provider = detail::strOr(j, "provider");
+      p.model    = detail::strOr(j, "model");
+      p.note     = detail::strOr(j, "note");
+      if (auto u = j.find("usage"); u != j.items().end())
+         p.usage = detail::usageFromJson(u->second);
+      e.payload = std::move(p);
    } else if (type == "compaction") {
       domain::CompactionEntry p;
       p.summary          = detail::strOr(j, "summary");
       p.firstKeptEntryId = detail::strOr(j, "firstKeptEntryId");
       p.tokensBefore     = detail::intOr(j, "tokensBefore");
+      detail::jsonField(j, "details", p.detailsJson);
+      if (auto u = j.find("usage"); u != j.items().end() && u->second.isObject()) {
+         p.usage    = detail::usageFromJson(u->second);
+         p.hasUsage = true;
+      }
+      p.fromHook = detail::boolOr(j, "fromHook");
+      if (auto s = j.find("systemMessage");
+          s != j.items().end() && s->second.isObject()) {
+         if (auto sm = detail::messageFromJson(s->second)) {
+            p.systemMessage    = std::move(*sm);
+            p.hasSystemMessage = true;
+         }
+      }
       e.payload = std::move(p);
    } else if (type == "branch_summary") {
-      e.payload = domain::BranchSummaryEntry{
-         detail::strOr(j, "fromId"), detail::strOr(j, "summary")};
+      domain::BranchSummaryEntry p;
+      p.fromId  = detail::strOr(j, "fromId");
+      p.summary = detail::strOr(j, "summary");
+      detail::jsonField(j, "details", p.detailsJson);
+      if (auto u = j.find("usage"); u != j.items().end() && u->second.isObject()) {
+         p.usage    = detail::usageFromJson(u->second);
+         p.hasUsage = true;
+      }
+      p.fromHook = detail::boolOr(j, "fromHook");
+      e.payload = std::move(p);
    } else if (type == "custom") {
-      e.payload = domain::CustomEntry{detail::strOr(j, "customType")};
+      domain::CustomEntry p;
+      p.customType = detail::strOr(j, "customType");
+      detail::jsonField(j, "data", p.dataJson);
+      e.payload = std::move(p);
    } else if (type == "label") {
       domain::LabelEntry p;
       p.targetId = detail::strOr(j, "targetId");
@@ -394,8 +587,8 @@ inline auto entryFromJson(folly::dynamic const& j) -> std::optional<domain::Entr
       domain::CustomMessageEntry p;
       p.customType = detail::strOr(j, "customType");
       p.display    = detail::boolOr(j, "display");
-      if (auto it = j.find("content"); it != j.items().end())
-         p.contentJson = folly::toJson(it->second);
+      detail::jsonField(j, "content", p.contentJson);
+      detail::jsonField(j, "details", p.detailsJson);
       e.payload = std::move(p);
    } else if (type == "context_edit") {
       domain::ContextEditEntry p;

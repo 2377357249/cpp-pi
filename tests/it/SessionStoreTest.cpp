@@ -135,6 +135,112 @@ TEST(SessionStore, ModelChangeEntryPersisted) {
    }
 }
 
+// 手写富 entry JSONL -> switch_session -> get_entries 字段还原
+// 直击 messageFromJson/usageFromJson 全部分支: assistant 块(thinking/toolCall/
+// usage)、toolResult details+image、usage record、compaction、custom、label、
+// custom_message、context_edit、bashExecution.
+TEST(SessionStore, RichEntriesRoundTrip) {
+   SessDir t;
+   auto const file = (t.dir / "sessions" / "rich.jsonl");
+   fs::create_directories(file.parent_path());
+   {
+      std::ofstream f{file};
+      f << R"({"type":"session","version":3,"id":"rich-1","timestamp":"2025-01-01T00:00:00.000Z","cwd":"/tmp"})" << "\n";
+      f << R"({"type":"message","id":"aaaa0001","parentId":null,"timestamp":"2025-01-01T00:00:01.000Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hmm","thinkingSignature":"sig1"},{"type":"text","text":"let me check"},{"type":"toolCall","id":"call_1","name":"bash","arguments":{"command":"ls"},"thoughtSignature":"ts"}],"api":"openai-responses","provider":"openai","model":"gpt-5","usage":{"input":10,"output":5,"cacheRead":2,"cacheWrite":1,"totalTokens":18,"reasoning":3,"cost":{"input":0.1,"output":0.2,"cacheRead":0.01,"cacheWrite":0.02,"total":0.33}},"stopReason":"toolUse","timestamp":1735689600000,"durationMs":42}})" << "\n";
+      f << R"({"type":"message","id":"bbbb0002","parentId":"aaaa0001","timestamp":"2025-01-01T00:00:02.000Z","message":{"role":"toolResult","toolCallId":"call_1","toolName":"bash","content":[{"type":"text","text":"file.txt"},{"type":"image","data":"AAAA","mimeType":"image/png"}],"details":{"exitCode":0},"isError":false,"durationMs":7,"timestamp":1735689601000}})" << "\n";
+      f << R"({"type":"usage","id":"cccc0003","parentId":"bbbb0002","timestamp":"2025-01-01T00:00:03.000Z","kind":"cache_warm","provider":"openai","model":"gpt-5","usage":{"input":3,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":3,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"note":"warmup"})" << "\n";
+      f << R"({"type":"label","id":"dddd0004","parentId":"cccc0003","timestamp":"2025-01-01T00:00:04.000Z","targetId":"aaaa0001","label":"checkpoint"})" << "\n";
+      f << R"({"type":"custom","id":"eeee0005","parentId":"dddd0004","timestamp":"2025-01-01T00:00:05.000Z","customType":"ext-note","data":{"x":1}})" << "\n";
+      f << R"({"type":"custom_message","id":"ffff0006","parentId":"eeee0005","timestamp":"2025-01-01T00:00:06.000Z","customType":"ui","display":true,"content":[{"type":"text","text":"hi"}],"details":{"k":1}})" << "\n";
+      f << R"({"type":"message","id":"11110007","parentId":"ffff0006","timestamp":"2025-01-01T00:00:07.000Z","message":{"role":"bashExecution","command":"ls /tmp","output":"out","cancelled":false,"truncated":true,"exitCode":0,"fullOutputPath":"/tmp/x.log","timestamp":1735689602000}})" << "\n";
+      f << R"({"type":"compaction","id":"22220008","parentId":"11110007","timestamp":"2025-01-01T00:00:08.000Z","summary":"everything so far","firstKeptEntryId":"ffff0006","tokensBefore":1234,"details":{"a":1},"usage":{"input":1,"output":1,"cacheRead":0,"cacheWrite":0,"totalTokens":2,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"fromHook":true})" << "\n";
+      f << R"({"type":"branch_summary","id":"33330009","parentId":"22220008","timestamp":"2025-01-01T00:00:09.000Z","summary":"branched","fromId":"aaaa0001","details":{"b":2},"fromHook":true})" << "\n";
+      f << R"({"type":"context_edit","id":"44440010","parentId":"33330009","timestamp":"2025-01-01T00:00:10.000Z","targetId":"bbbb0002","replacement":{"content":[{"type":"text","text":"redacted"}]}})" << "\n";
+   }
+   ASSERT_TRUE(fs::exists(file));
+
+   auto p = RpcProc::spawn({"--session-dir", t.dir.string()}, false);
+   p.send("{\"type\":\"switch_session\",\"sessionPath\":\"" + file.string()
+          + "\"}");
+   ASSERT_TRUE(p.readResponse("switch_session")["success"].getBool());
+   p.send(R"({"type":"get_entries"})");
+   auto e = p.readResponse("get_entries");
+   auto const& entries = e["data"]["entries"];
+   ASSERT_TRUE(entries.isArray());
+
+   bool sawAssistant = false, sawToolResult = false, sawUsage = false,
+        sawLabel = false, sawCustom = false, sawCustomMsg = false,
+        sawBashExec = false, sawCompaction = false, sawBranch = false,
+        sawCtxEdit = false;
+   for (auto const& en : entries) {
+      if (!en.count("type")) continue;
+      auto const ty = en["type"].getString();
+      if (ty == "message" && en.count("message")) {
+         auto const& m = en["message"];
+         auto const role = m.count("role") ? m["role"].getString() : "";
+         if (role == "assistant" && m.count("content")) {
+            for (auto const& b : m["content"]) {
+               auto const bt = b["type"].getString();
+               if (bt == "thinking"
+                   && b["thinkingSignature"].getString() == "sig1")
+                  sawAssistant = true;
+               if (bt == "toolCall" && b["id"].getString() == "call_1"
+                   && b["thoughtSignature"].getString() == "ts")
+                  sawAssistant = sawAssistant || b.count("arguments") > 0;
+            }
+            EXPECT_EQ(m["usage"]["cost"]["total"].asDouble(), 0.33);
+            EXPECT_EQ(m["stopReason"].getString(), "toolUse");
+         }
+         if (role == "toolResult" && m["toolCallId"].getString() == "call_1") {
+            sawToolResult = m["details"]["exitCode"].getInt() == 0
+                            && m["durationMs"].getInt() == 7;
+            for (auto const& b : m["content"])
+               if (b["type"].getString() == "image"
+                   && b["mimeType"].getString() == "image/png")
+                  sawToolResult = true;
+         }
+         if (role == "bashExecution")
+            sawBashExec = m["command"].getString() == "ls /tmp"
+                          && m["truncated"].getBool()
+                          && m["fullOutputPath"].getString() == "/tmp/x.log";
+      }
+      if (ty == "usage")
+         sawUsage = en["kind"].getString() == "cache_warm"
+                    && en["usage"]["input"].getInt() == 3
+                    && en["note"].getString() == "warmup";
+      if (ty == "label")
+         sawLabel = en["targetId"].getString() == "aaaa0001"
+                    && en["label"].getString() == "checkpoint";
+      if (ty == "custom")
+         sawCustom = en["customType"].getString() == "ext-note"
+                     && en["data"]["x"].getInt() == 1;
+      if (ty == "custom_message")
+         sawCustomMsg = en["customType"].getString() == "ui"
+                        && en["details"]["k"].getInt() == 1;
+      if (ty == "compaction")
+         sawCompaction = en["summary"].getString() == "everything so far"
+                         && en["tokensBefore"].getInt() == 1234
+                         && en["fromHook"].getBool()
+                         && en["usage"]["input"].getInt() == 1;
+      if (ty == "branch_summary")
+         sawBranch = en["fromId"].getString() == "aaaa0001"
+                     && en["details"]["b"].getInt() == 2;
+      if (ty == "context_edit")
+         sawCtxEdit = en["targetId"].getString() == "bbbb0002"
+                      && en["replacement"]["content"].isArray();
+   }
+   EXPECT_TRUE(sawAssistant);
+   EXPECT_TRUE(sawToolResult);
+   EXPECT_TRUE(sawUsage);
+   EXPECT_TRUE(sawLabel);
+   EXPECT_TRUE(sawCustom);
+   EXPECT_TRUE(sawCustomMsg);
+   EXPECT_TRUE(sawBashExec);
+   EXPECT_TRUE(sawCompaction);
+   EXPECT_TRUE(sawBranch);
+   EXPECT_TRUE(sawCtxEdit);
+}
+
 // fork 到 user 消息 entry -> 新分支文件落盘, get_entries 截到 fork 点之前
 TEST(SessionStore, ForkAtUserEntryWritesBranch) {
    SessDir t;
