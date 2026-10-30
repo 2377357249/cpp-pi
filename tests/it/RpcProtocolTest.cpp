@@ -4,6 +4,7 @@
 #include "RpcHarness.h"
 
 using pi::it::RpcHarness;
+using pi::it::RpcProc;
 
 // ---------------------------------------------------------------------------
 // 用例结构对齐 pi packages/coding-agent/test/rpc.test.ts +
@@ -121,7 +122,7 @@ TEST(RpcMode, ShouldGetSessionStats) {
       R"({"type":"get_session_stats"})" "\n");
    auto d = RpcHarness::response(frames, "get_session_stats")["data"];
    ASSERT_TRUE(d.isObject());
-   EXPECT_TRUE(d.count("sessionFile"));
+   EXPECT_FALSE(d.count("sessionFile"));   // in-memory 会话无文件
    EXPECT_TRUE(d.count("sessionId"));
    EXPECT_GE(d["userMessages"].getInt(), 1);
    EXPECT_GE(d["assistantMessages"].getInt(), 1);
@@ -206,24 +207,22 @@ TEST(RpcMode, ShouldSetAndGetSessionName) {
 
 // == rpc.test.ts: "should get session entries with since cursor" =========
 TEST(RpcMode, ShouldGetSessionEntriesWithSinceCursor) {
-   auto frames = RpcHarness::run(
-      R"({"type":"prompt","message":"ok"})" "\n"
-      R"({"type":"get_entries"})" "\n");
-
-   auto d = RpcHarness::response(frames, "get_entries")["data"];
+   auto proc = RpcProc::spawn();
+   proc.send(R"({"type":"prompt","message":"ok"})");
+   proc.readUntil("agent_end");
+   proc.send(R"({"type":"get_entries"})");
+   auto d = proc.readResponse("get_entries")["data"];
    ASSERT_TRUE(d.isObject());
    auto const& entries = d["entries"];
-   ASSERT_GE(entries.size(), 2u);   // user + assistant (含 tool 消息共 4)
+   ASSERT_GE(entries.size(), 2u);
    for (auto const& e : entries) EXPECT_TRUE(e.count("id"));
    EXPECT_EQ(d["leafId"].getString(),
              entries[entries.size() - 1]["id"].getString());
 
-   // since 游标: 只要首个 entry 之后的
-   auto frames2 = RpcHarness::run(
-      R"({"type":"prompt","message":"ok"})" "\n"
-      R"({"type":"get_entries","since":")"
-         + entries[0]["id"].getString() + "\"}\n");
-   auto d2 = RpcHarness::response(frames2, "get_entries")["data"];
+   // since 游标: 只要首个 entry 之后的 (同会话, 真实 id)
+   proc.send(std::string{"{\"type\":\"get_entries\",\"since\":\""}
+             + entries[0]["id"].getString() + "\"}");
+   auto d2 = proc.readResponse("get_entries")["data"];
    ASSERT_EQ(d2["entries"].size(), entries.size() - 1);
    EXPECT_EQ(d2["entries"][0]["id"].getString(),
              entries[1]["id"].getString());
@@ -237,7 +236,7 @@ TEST(RpcMode, UnknownSinceIdIsErrorResponse) {
       R"({"type":"get_entries","since":"nonexistent-id"})" "\n");
    auto resp = RpcHarness::response(frames, "get_entries");
    EXPECT_FALSE(resp["success"].getBool());
-   EXPECT_EQ(resp["error"].getString(), "Entry not found");
+   EXPECT_EQ(resp["error"].getString(), "Entry not found: nonexistent-id");
 }
 
 // == rpc.test.ts: "should get session tree" ==============================
@@ -341,7 +340,7 @@ TEST(RpcMode, UnknownCommandEchoesId) {
    auto resp = RpcHarness::response(frames, "totally_made_up");
    EXPECT_FALSE(resp["success"].getBool());
    EXPECT_EQ(resp["id"].getString(), "u1");
-   EXPECT_EQ(resp["error"].getString(), "unsupported command");
+   EXPECT_EQ(resp["error"].getString(), "Unknown command: totally_made_up");
 }
 
 // == rpc-jsonl.test.ts: 行内 U+2028/U+2029 不被当换行 ====================
@@ -377,15 +376,19 @@ TEST(RpcMode, MalformedJsonIsErrorResponse) {
    ASSERT_EQ(frames.size(), 1u);
    EXPECT_EQ(frames[0]["type"].getString(), "response");
    EXPECT_FALSE(frames[0]["success"].getBool());
-   EXPECT_TRUE(frames[0]["error"].getString().find("invalid json") !=
+   EXPECT_EQ(frames[0]["command"].getString(), "parse");
+   EXPECT_TRUE(frames[0]["error"].getString().find("Failed to parse command") !=
                std::string::npos);
 }
 
 TEST(RpcMode, MissingTypeIsErrorResponse) {
    auto frames = RpcHarness::run(R"({"foo":1})" "\n");
-   auto resp = RpcHarness::response(frames, "unknown");
-   ASSERT_TRUE(resp.isObject());
+   ASSERT_EQ(frames.size(), 1u);
+   auto const& resp = frames[0];
+   EXPECT_EQ(resp["type"].getString(), "response");
    EXPECT_FALSE(resp["success"].getBool());
+   EXPECT_FALSE(resp.count("command"));      // pi: command 键省略
+   EXPECT_EQ(resp["error"].getString(), "Unknown command: undefined");
 }
 
 TEST(RpcMode, AbortVariantsAreAcknowledged) {
@@ -397,16 +400,27 @@ TEST(RpcMode, AbortVariantsAreAcknowledged) {
       EXPECT_TRUE(RpcHarness::response(frames, c)["success"].getBool()) << c;
 }
 
-TEST(RpcMode, UnsupportedCommandsAreErrorResponses) {
+TEST(RpcMode, CommandErrorPathsMatchPi) {
    auto frames = RpcHarness::run(
-      R"({"type":"fork","entryId":"e-0"})" "\n"
-      R"({"type":"switch_session","sessionPath":"/tmp/x"})" "\n"
-      R"({"type":"get_fork_messages"})" "\n");
-   for (auto c : {"fork", "switch_session", "get_fork_messages"}) {
-      auto resp = RpcHarness::response(frames, c);
-      EXPECT_FALSE(resp["success"].getBool()) << c;
-      EXPECT_EQ(resp["error"].getString(), "unsupported command") << c;
-   }
+      R"({"type":"fork","entryId":"deadbeef"})" "\n"
+      R"({"type":"switch_session","sessionPath":"/tmp/nonexistent-pi-session.jsonl"})" "\n"
+      R"({"type":"get_fork_messages"})" "\n"
+      R"({"type":"set_session_name","name":"  "})" "\n");
+   // fork: 非 user message 或不存在的 entry -> Invalid entry ID for forking
+   EXPECT_EQ(RpcHarness::response(frames, "fork")["error"].getString(),
+             "Invalid entry ID for forking");
+   // switch_session: 文件无效 -> 非 pi 会话错误
+   auto sw = RpcHarness::response(frames, "switch_session");
+   EXPECT_FALSE(sw["success"].getBool());
+   EXPECT_TRUE(sw["error"].getString().find("valid pi session")
+               != std::string::npos);
+   // get_fork_messages: 空会话 -> success, messages:[]
+   auto fm = RpcHarness::response(frames, "get_fork_messages");
+   EXPECT_TRUE(fm["success"].getBool());
+   EXPECT_EQ(fm["data"]["messages"].size(), 0u);
+   // 空白会话名 -> Session name cannot be empty
+   EXPECT_EQ(RpcHarness::response(frames, "set_session_name")["error"]
+                .getString(), "Session name cannot be empty");
 }
 
 // == 工具路径变体 (mock 前缀路由): bash 工具 + 未知工具错误分支 ============

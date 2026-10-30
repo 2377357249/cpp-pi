@@ -8,26 +8,30 @@
 namespace pi::iface::adapter {
 
 // ---------------------------------------------------------------------------
-// 内存会话存储(骨架): 验证端口与 EV_STORE_DONE 链路.
-// 正式的 JsonlSessionStore 用 folly::dynamic 序列化, 落 ~/.cpp-pi/sessions/*.jsonl.
+// 内存会话存储: 不落盘 (--no-session 场景的对应物). entry 粒度存全量.
 // ---------------------------------------------------------------------------
 class InMemorySessionStore : public domain::ISessionStore {
 public:
-   void append(domain::Session::Id const& id,
-               std::vector<domain::Message> const& delta,
-               domain::StoreDoneHandler done) override {
-      auto& log = sessions_[id];
+   void append(domain::Session const&          session,
+               std::vector<domain::Entry> const& delta,
+               domain::StoreDoneHandler          done) override {
+      auto& log = sessions_[session.id()];
       log.insert(log.end(), delta.begin(), delta.end());
       done(true);
    }
 
-   void load(domain::Session::Id const& id, domain::LoadDoneHandler done) override {
-      auto it = sessions_.find(id);
-      done(it == sessions_.end() ? std::vector<domain::Message>{} : it->second);
+   void load(std::string const& sessionPath,
+             domain::LoadDoneHandler done) override {
+      auto it = sessions_.find(sessionPath);
+      domain::Session s{sessionPath};
+      if (it != sessions_.end()) {
+         for (auto e : it->second) s.appendEntry(std::move(e));
+      }
+      done(std::move(s), it == sessions_.end() ? std::string{} : sessionPath);
    }
 
 private:
-   std::map<domain::Session::Id, std::vector<domain::Message>> sessions_;
+   std::map<domain::Session::Id, std::vector<domain::Entry>> sessions_;
 };
 
 } // namespace pi::iface::adapter

@@ -29,7 +29,7 @@ struct Persister {
       auto delta = ROLE(SessionCtx).session.unpersisted();
       if (delta.empty()) return false;
 
-      store_.append(sessionId_, std::move(delta), [this](bool ok) {
+      store_.append(ROLE(SessionCtx).session, delta, [this](bool ok) {
          ROLE(TurnStateCtx).lastStoreOk = ok;
          ROLE(EventQueueCtx).post(EV_STORE_DONE, StoreDoneMsg{});
       });

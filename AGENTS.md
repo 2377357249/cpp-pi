@@ -27,6 +27,12 @@
 5. **全部 vendor**：三方库一律进 `third_party/`（git clone/submodule/FetchContent），
    **禁止 `brew install` 等全局安装**作为构建前置条件。
 6. **C++20**（folly 要求；trans-dsl-2 在 C++20 下已验证）。
+   - **用高特性**：`std::format`/`std::ranges`/`std::filesystem`/`std::optional`/
+     `std::variant`/`std::chrono`；禁 `snprintf`/`gmtime`/手写循环找元素等低层写法。
+   - **禁魔法数**：所有裸字面量换具名 `constexpr`。
+   - **禁 try/catch**：错误一律用返回值传播（`folly::Expected`/`std::optional`/
+     `bool`）。唯一例外是库边界适配 `infra/util/JsonSafe.h`（folly `parseJson`
+     只抛异常——项目代码统一走 `infra::parseJsonSafe`/`jsonOr`）。
 
 ## 架构
 

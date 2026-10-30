@@ -6,7 +6,12 @@
 
 namespace pi::domain {
 
-enum class Role { System, User, Assistant, Tool };
+// pi Message 角色全集 (含 coding-agent declaration-merged 自定义角色):
+//   system/user/assistant/toolResult + bashExecution/custom/branchSummary/compactionSummary
+enum class Role {
+   System, User, Assistant, Tool,
+   BashExecution, Custom, BranchSummary, CompactionSummary
+};
 
 // pi StopReason 全集 ("pending"|"stop"|"length"|"toolUse"|"error"|"aborted"|"deferred").
 // 枚举放这里(而不是 StopReason.h)避免 include 环: Message 携带 stopReason 字段.
@@ -38,7 +43,7 @@ struct ThinkingBlock {
 };
 
 // pi Usage.cost
-struct ModelCost {
+struct UsageCost {
    double input = 0, output = 0, cacheRead = 0, cacheWrite = 0, total = 0;
    bool   totalFromProvider = false;
 };
@@ -49,7 +54,7 @@ struct Usage {
    int64_t totalTokens  = 0;
    int64_t reasoning    = -1;   // <0 = provider 未上报
    int64_t cacheWrite1h = -1;   // <0 = 未上报
-   ModelCost cost;
+   UsageCost cost;
 };
 
 // 值对象: 一条对话消息 (pi Message 联合类型的域内表达).
@@ -80,6 +85,25 @@ struct Message {
    Usage       usage;
    bool        hasEndTurn = false;   // provider 是否上报了 endTurn
    bool        endTurn    = false;
+
+   // ---- 自定义角色字段 ----
+   // Custom: {role:"custom", customType, content, display, details?, timestamp}
+   std::string customType;
+   std::string contentJson;      // content 线格式 (string | (text|image)[])
+   bool        display  = false;
+   // BashExecution: {command, output→text, exitCode, cancelled, truncated,
+   //                 fullOutputPath?, excludeFromContext?, timestamp}
+   std::string command;
+   int64_t     exitCode  = -9999;   // -9999 = undefined
+   bool        cancelled = false;
+   bool        truncated = false;
+   std::string fullOutputPath;
+   bool        excludeFromContext = false;
+   // BranchSummary: {summary, fromId, timestamp}
+   // CompactionSummary: {summary, tokensBefore, timestamp}
+   std::string summary;
+   std::string fromId;            // "" = null
+   int64_t     tokensBefore = -1; // <0 = 无
 };
 
 } // namespace pi::domain

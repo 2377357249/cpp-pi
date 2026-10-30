@@ -1,51 +1,65 @@
 #pragma once
 
+#include <algorithm>
+#include <cctype>
 #include <deque>
+#include <format>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <optional>
+#include <ranges>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include <folly/json/json.h>
 
-#include <pi/interface/trans/AgentSessionService.h>
+#include <pi/domain/model/Model.h>
+#include <pi/domain/session/ISessionStore.h>
 #include <pi/domain/session/Session.h>
 #include <pi/infra/process/Shell.h>
+#include <pi/infra/util/Ids.h>
+#include <pi/infra/util/JsonSafe.h>
 #include <pi/interface/rpc/JsonCodec.h>
+#include <pi/interface/trans/AgentSessionService.h>
 
 namespace pi::iface::rpc {
 
 // ---------------------------------------------------------------------------
-// RPC 前端: 与 pi TS TUI 对接的 NDJSON 协议端.
-// stdin 收 RpcCommand(JSON 行) -> stdout 出 response + AgentEvent 行.
-// 协议面对齐 pi packages/coding-agent/src/modes/rpc/rpc-types.ts:
+// RPC 前端: 与 pi TS TUI 对接的 NDJSON 协议端 (rpc-types.ts 1:1).
 //   命令帧 {id?, type, ...}; 响应帧 {id?, type:"response", command, success,
-//   data|error}; 事件帧即 AgentEvent
-//   (agent_start/turn_start/message_start/message_end/turn_end/agent_end).
-// 骨架阶段事件按 run 粒度合成: 事务跑完后按新增消息补发 message_*.
+//   data|error}; 事件帧即 AgentSessionEvent.
+// 同步执行模型: 事件按序合成 (流式/并发在后续批次接 EV_* 链路).
 // ---------------------------------------------------------------------------
 class RpcFrontend {
 public:
-   RpcFrontend(AgentSessionService& service,
-               domain::Session&          session,
-               std::istream&             in  = std::cin,
-               std::ostream&             out = std::cout)
-      : service_(service), session_(session), in_(in), out_(out) {}
+   static constexpr std::array kThinkingLevels{
+      "off", "minimal", "low", "medium", "high", "xhigh", "max"};
+
+   RpcFrontend(AgentSessionService&   service,
+               domain::Session&       session,
+               domain::ISessionStore* store = nullptr,
+               std::istream&          in  = std::cin,
+               std::ostream&          out = std::cout)
+      : service_(service), session_(session), store_(store),
+        in_(in), out_(out) {}
+
+   auto setModel(domain::Model m) -> void { model_ = std::move(m); }
 
    int run() {
       for (std::string line; std::getline(in_, line);) {
          if (line.empty()) continue;
+         if (!line.empty() && line.back() == '\r') line.pop_back();
 
-         std::optional<folly::dynamic> cmd;
-         try {
-            cmd = folly::parseJson(line);
-         } catch (std::exception const& e) {
-            emit(error_(folly::dynamic{}, "unknown",
-                        std::string{"invalid json: "} + e.what()));
+         auto parsed = infra::parseJsonSafe(line);
+         if (parsed.hasError()) {
+            emit(error_(folly::dynamic{}, "parse",
+                        std::format("Failed to parse command: {}",
+                                    parsed.error())));
             continue;
          }
-
-         auto resp = handle(*cmd);
+         auto resp = handle(*parsed);
          if (!resp.isNull()) emit(resp);   // prompt 的响应在 handle 内已发
       }
       return 0;
@@ -58,16 +72,29 @@ private:
    }
 
    static auto idOf(folly::dynamic const& cmd) -> folly::dynamic {
-      return cmd.count("id") ? cmd["id"] : folly::dynamic{};
+      auto it = cmd.find("id");
+      return it != cmd.items().end() ? it->second : folly::dynamic{};
    }
 
    static auto ok_(folly::dynamic const& id, std::string_view command,
-                   folly::dynamic data = folly::dynamic::object()) -> folly::dynamic {
+                   folly::dynamic data = folly::dynamic::object())
+      -> folly::dynamic {
       folly::dynamic r = folly::dynamic::object("type", "response")
                                               ("command", std::string{command})
                                               ("success", true);
       if (id.isString()) r["id"] = id;
       if (!data.empty()) r["data"] = std::move(data);
+      return r;
+   }
+
+   // 显式 data (允许 null): cycle_*/≤1 候选返回 data:null.
+   static auto okData_(folly::dynamic const& id, std::string_view command,
+                       folly::dynamic data) -> folly::dynamic {
+      folly::dynamic r = folly::dynamic::object("type", "response")
+                                              ("command", std::string{command})
+                                              ("success", true);
+      if (id.isString()) r["id"] = id;
+      r["data"] = std::move(data);
       return r;
    }
 
@@ -92,8 +119,7 @@ private:
                                  ("followUp", std::move(followUp)));
    }
 
-   // run 结束后排干队列: steering 先于 followUp (pi 语义: steer 在两轮
-   // 迭代间注入, followUp 在 agent 完全空闲后才处理).
+   // run 结束后排干队列: steering 先于 followUp.
    auto drainQueues() -> void {
       while (!steering_.empty() || !followUp_.empty()) {
          std::string msg;
@@ -111,63 +137,63 @@ private:
    }
 
    // ---------- AgentEvent 流 ----------
-   // pi 语义: agent_start/turn_start 包裹一轮 run; 每条新消息一对
-   // message_start/message_end; turn_end 带 assistant message + toolResults;
-   // agent_end 带本 run 全部新消息.
    auto emitTurnEvents() -> void {
-      auto const& msgs = session_.messages();
+      auto const msgs = session_.messages();
       if (msgs.size() <= emittedCount_) return;
 
       auto newMsgs = folly::dynamic::array();
-      for (auto i = emittedCount_; i < msgs.size(); ++i)
-         newMsgs.push_back(messageToJson(msgs[i]));
+      for (auto const& m : msgs | std::views::drop(emittedCount_))
+         newMsgs.push_back(messageToJson(m));
 
       emit(folly::dynamic::object("type", "agent_start"));
       emit(folly::dynamic::object("type", "turn_start"));
 
       auto toolResults = folly::dynamic::array();
       folly::dynamic    lastAssistant;
-      for (auto i = emittedCount_; i < msgs.size(); ++i) {
-         auto mj = messageToJson(msgs[i]);
+      for (auto const& m : msgs | std::views::drop(emittedCount_)) {
+         auto mj = messageToJson(m);
          emit(folly::dynamic::object("type", "message_start")
                                     ("message", mj));
          emit(folly::dynamic::object("type", "message_end")
                                     ("message", mj));
-         if (msgs[i].role == domain::Role::Tool) toolResults.push_back(mj);
-         if (msgs[i].role == domain::Role::Assistant) lastAssistant = mj;
+         if (m.role == domain::Role::Tool) toolResults.push_back(mj);
+         if (m.role == domain::Role::Assistant) lastAssistant = mj;
       }
       emittedCount_ = msgs.size();
 
       emit(folly::dynamic::object("type", "turn_end")
-                                 ("message", lastAssistant.isNull()
-                                                ? folly::dynamic::object()
-                                                : std::move(lastAssistant))
-                                 ("toolResults", std::move(toolResults)));
+            ("message", lastAssistant.isNull() ? folly::dynamic::object()
+                                               : std::move(lastAssistant))
+            ("toolResults", std::move(toolResults)));
       emit(folly::dynamic::object("type", "agent_end")
-                                 ("messages", std::move(newMsgs)));
+            ("messages", std::move(newMsgs))("willRetry", false));
    }
 
    // ---------- 命令分发 ----------
    auto handle(folly::dynamic const& cmd) -> folly::dynamic {
-      auto id   = idOf(cmd);
-      auto type = cmd.count("type") && cmd["type"].isString()
-                    ? cmd["type"].getString() : std::string{};
+      auto const id   = idOf(cmd);
+      auto const type = strField(cmd, "type");
+
+      // pi: cmd.type 缺失 -> command 键省略, error "Unknown command: undefined"
+      if (type.empty()) {
+         folly::dynamic r = folly::dynamic::object
+            ("type", "response")("success", false)
+            ("error", "Unknown command: undefined");
+         if (id.isString()) r["id"] = id;
+         return r;
+      }
 
       if (type == "prompt") {
-         auto msg = cmd.count("message") && cmd["message"].isString()
-                      ? cmd["message"].getString() : std::string{};
-         // pi 语义: preflight 通过即回 disposition=started, 事件随后流出
          emit(ok_(id, "prompt",
                   folly::dynamic::object("disposition", "started")));
-         service_.runTurn(msg);
+         service_.runTurn(strField(cmd, "message"));
          emitTurnEvents();
          drainQueues();
-         return folly::dynamic{};   // 响应已发
+         return folly::dynamic{};
       }
       if (type == "steer" || type == "follow_up") {
-         auto msg = cmd.count("message") && cmd["message"].isString()
-                      ? cmd["message"].getString() : std::string{};
-         (type == "steer" ? steering_ : followUp_).push_back(msg);
+         (type == "steer" ? steering_ : followUp_)
+            .push_back(strField(cmd, "message"));
          emitQueueUpdate();
          return ok_(id, type,
                     folly::dynamic::object("disposition", "queued"));
@@ -180,13 +206,15 @@ private:
                     folly::dynamic::object("messages", messagesToJson(session_)));
       }
       if (type == "get_last_assistant_text") {
-         auto const& msgs = session_.messages();
          folly::dynamic text;
-         for (auto it = msgs.rbegin(); it != msgs.rend(); ++it) {
-            if (it->role == domain::Role::Assistant && !it->text.empty()) {
-               text = it->text;
-               break;
-            }
+         for (auto const& m : session_.messages() | std::views::reverse) {
+            // pi: 跳过 aborted && 空 content
+            if (m.role != domain::Role::Assistant) continue;
+            if (m.stopReason == domain::StopReason::Aborted
+                && m.text.empty()) continue;
+            if (m.text.empty()) continue;
+            text = m.text;
+            break;
          }
          return ok_(id, "get_last_assistant_text",
                     folly::dynamic::object("text", text));
@@ -204,65 +232,85 @@ private:
                        folly::dynamic::array(modelJson())));
       }
       if (type == "get_available_thinking_levels") {
+         auto levels = folly::dynamic::array();
+         for (auto l : kThinkingLevels) levels.push_back(l);
          return ok_(id, "get_available_thinking_levels",
-                    folly::dynamic::object("levels",
-                       folly::dynamic::array("off", "minimal", "low",
-                                             "medium", "high", "xhigh")));
+                    folly::dynamic::object("levels", std::move(levels)));
       }
       if (type == "set_model") {
-         modelProvider_ = cmd.count("provider") ? cmd["provider"].getString()
-                                                : modelProvider_;
-         modelId_       = cmd.count("modelId")  ? cmd["modelId"].getString()
-                                                : modelId_;
-         return ok_(id, "set_model");
+         auto const provider = strField(cmd, "provider");
+         auto const modelId  = strField(cmd, "modelId");
+         // pi: getAvailableSnapshot lookup; 单模型目录阶段只校验非空
+         if (provider.empty() || modelId.empty())
+            return error_(id, "set_model",
+                          std::format("Model not found: {}/{}",
+                                      provider, modelId));
+         model_.provider = provider;
+         model_.id = model_.name = modelId;
+         session_.appendEntry(domain::Entry{domain::EntryBase{}, domain::ModelChangeEntry{provider, modelId}});
+         return ok_(id, "set_model", modelJson());
       }
       if (type == "cycle_model") {
-         return ok_(id, "cycle_model",
-                    folly::dynamic::object("model", modelJson()));
+         // 当前模型目录只含一个模型: ≤1 候选 -> data:null (pi 语义)
+         return okData_(id, "cycle_model", nullptr);
       }
       if (type == "set_thinking_level") {
-         if (cmd.count("level") && cmd["level"].isString())
-            thinkingLevel_ = cmd["level"].getString();
+         auto const level = strField(cmd, "level");
+         if (std::ranges::find(kThinkingLevels, level)
+             != kThinkingLevels.end() && level != thinkingLevel_) {
+            thinkingLevel_ = level;
+            session_.appendEntry(domain::Entry{domain::EntryBase{}, domain::ThinkingLevelEntry{level}});
+            emit(folly::dynamic::object("type", "thinking_level_changed")
+                                       ("level", level));
+         }
          return ok_(id, "set_thinking_level");
       }
       if (type == "cycle_thinking_level") {
-         static char const* kLevels[] = {"off", "minimal", "low",
-                                         "medium", "high", "xhigh"};
-         for (auto i = 0; i < 6; ++i) {
-            if (thinkingLevel_ == kLevels[i]) {
-               thinkingLevel_ = kLevels[(i + 1) % 6];
-               break;
-            }
-         }
+         if (!model_.reasoning)
+            return okData_(id, "cycle_thinking_level", nullptr);
+         auto const it = std::ranges::find(kThinkingLevels, thinkingLevel_);
+         auto const n  = static_cast<size_t>(it - kThinkingLevels.begin());
+         thinkingLevel_ = kThinkingLevels[(n + 1) % kThinkingLevels.size()];
+         session_.appendEntry(domain::Entry{domain::EntryBase{}, domain::ThinkingLevelEntry{thinkingLevel_}});
+         emit(folly::dynamic::object("type", "thinking_level_changed")
+                                    ("level", thinkingLevel_));
          return ok_(id, "cycle_thinking_level",
                     folly::dynamic::object("level", thinkingLevel_));
       }
       if (type == "set_steering_mode") {
-         if (cmd.count("mode") && cmd["mode"].isString())
-            steeringMode_ = cmd["mode"].getString();
+         steeringMode_ = strField(cmd, "mode", steeringMode_);
          return ok_(id, "set_steering_mode");
       }
       if (type == "set_follow_up_mode") {
-         if (cmd.count("mode") && cmd["mode"].isString())
-            followUpMode_ = cmd["mode"].getString();
+         followUpMode_ = strField(cmd, "mode", followUpMode_);
          return ok_(id, "set_follow_up_mode");
       }
       if (type == "set_auto_compaction") {
-         autoCompactionEnabled_ =
-            !cmd.count("enabled") || cmd["enabled"].getBool();
+         autoCompactionEnabled_ = boolField(cmd, "enabled", true);
          return ok_(id, "set_auto_compaction");
       }
       if (type == "set_auto_retry") {
-         autoRetryEnabled_ = !cmd.count("enabled") || cmd["enabled"].getBool();
+         autoRetryEnabled_ = boolField(cmd, "enabled", true);
          return ok_(id, "set_auto_retry");
       }
       if (type == "set_session_name") {
-         if (cmd.count("name") && cmd["name"].isString())
-            sessionName_ = cmd["name"].getString();
+         auto name = strField(cmd, "name");
+         // pi appendSessionInfo: [\r\n]+ -> " ", trim; 空名是错误
+         name = squashWs(std::move(name));
+         if (name.empty())
+            return error_(id, "set_session_name",
+                          "Session name cannot be empty");
+         session_.appendEntry(domain::Entry{domain::EntryBase{}, domain::SessionInfoEntry{name, true}});
+         emit(folly::dynamic::object("type", "session_info_changed")
+                                    ("name", name));
          return ok_(id, "set_session_name");
       }
       if (type == "new_session") {
          session_.reset();
+         session_.setId(infra::uuidv7());
+         if (auto p = strField(cmd, "parentSession"); !p.empty())
+            session_.setParentSessionPath(p);
+         session_.setFilePath({});
          emittedCount_ = 0;
          return ok_(id, "new_session",
                     folly::dynamic::object("cancelled", false));
@@ -283,48 +331,152 @@ private:
                                           ("followUp", std::move(followUp)));
       }
       if (type == "bash") {
-         auto cmdStr = cmd.count("command") && cmd["command"].isString()
-                         ? cmd["command"].getString() : std::string{};
-         auto r = runBash(cmdStr);
+         auto r = infra::runShell(strField(cmd, "command"));
+         // recordBashResult: bashExecution 消息入会话 (不发 message_*)
+         domain::Message bm{domain::Role::BashExecution, {}, {}, {}};
+         bm.command          = strField(cmd, "command");
+         bm.text             = r.output;
+         bm.exitCode         = r.exitCode;
+         bm.truncated        = r.truncated;
+         bm.excludeFromContext = boolField(cmd, "excludeFromContext", false);
+         bm.timestampMs      = infra::nowMs();
+         session_.appendEntry(domain::Entry{domain::EntryBase{}, domain::MessageEntry{std::move(bm)}});
+         emittedCount_ = session_.messages().size();   // 不出现在事件流
          return ok_(id, "bash",
                     folly::dynamic::object("output", r.output)
                        ("exitCode", r.exitCode)("cancelled", false)
                        ("truncated", r.truncated));
       }
       if (type == "compact") {
-         // 骨架: 不改写历史, 只回报指标. 真 compaction 走 LLM 摘要事务.
-         auto n = static_cast<int64_t>(session_.messages().size());
+         auto const n = static_cast<int64_t>(session_.entries().size());
          return ok_(id, "compact",
                     folly::dynamic::object
-                       ("summary", "mock compaction of " +
-                                      std::to_string(n) + " messages")
-                       ("firstKeptEntryId", folly::dynamic{})
+                       ("summary", std::format("mock compaction of {} entries", n))
+                       ("firstKeptEntryId", session_.leafId().empty()
+                          ? folly::dynamic(nullptr)
+                          : folly::dynamic(session_.leafId()))
                        ("tokensBefore", n));
       }
       if (type == "export_html") {
-         auto path = cmd.count("outputPath") && cmd["outputPath"].isString()
-                       ? cmd["outputPath"].getString()
-                       : session_.id() + ".html";
+         auto path = strField(cmd, "outputPath");
+         if (path.empty())
+            path = std::format("pi-session-{}.html", session_.id());
          exportHtml(path);
          return ok_(id, "export_html",
                     folly::dynamic::object("path", path));
       }
       if (type == "get_entries") {
-         auto data = entriesJson(cmd);
-         if (data.count("__error"))
-            return error_(id, "get_entries", data["__error"].getString());
-         return ok_(id, "get_entries", std::move(data));
+         return getEntries(id, cmd);
       }
       if (type == "get_tree") {
          return ok_(id, "get_tree", treeJson());
       }
-      return error_(id, type.empty() ? "unknown" : type,
-                    "unsupported command");
+      if (type == "get_fork_messages") {
+         auto msgs = folly::dynamic::array();
+         for (auto const& e : session_.entries()) {
+            auto const* me = std::get_if<domain::MessageEntry>(&e.payload);
+            if (!me || me->message.role != domain::Role::User) continue;
+            if (me->message.text.empty()) continue;
+            msgs.push_back(folly::dynamic::object
+               ("entryId", e.id)("text", me->message.text));
+         }
+         return ok_(id, "get_fork_messages",
+                    folly::dynamic::object("messages", std::move(msgs)));
+      }
+      if (type == "fork")  return doFork(id, cmd, /*at=*/false);
+      if (type == "clone") return doFork(id, cmd, /*at=*/true);
+      if (type == "switch_session") {
+         return switchSession(id, strField(cmd, "sessionPath"));
+      }
+      return error_(id, type, std::format("Unknown command: {}", type));
    }
 
    // ---------- bash ----------
-   static auto runBash(std::string const& cmd) -> infra::ShellResult {
-      return infra::runShell(cmd);
+   // (已内联进 handle; BashExecutionMessage 由 session_.appendEntry 记录)
+
+   // ---------- fork/clone ----------
+   auto doFork(folly::dynamic const& id, folly::dynamic const& cmd, bool at)
+      -> folly::dynamic {
+      auto const entryId = at ? session_.leafId()
+                              : strField(cmd, "entryId");
+      if (entryId.empty())
+         return error_(id, at ? "clone" : "fork",
+                       "Cannot clone session: no current entry selected");
+
+      auto const* target = session_.findEntry(entryId);
+      std::string selectedText;
+      if (auto const* me = target
+             ? std::get_if<domain::MessageEntry>(&target->payload)
+             : nullptr) {
+         if (me->message.role == domain::Role::User)
+            selectedText = me->message.text;
+      }
+
+      if (at) {
+         // clone: leafId 必须在, 上面已校验
+      } else {
+         // position "before": 目标是 user message, leaf 移到 parentId
+         if (!target
+             || !std::holds_alternative<domain::MessageEntry>(target->payload)
+             || std::get<domain::MessageEntry>(target->payload)
+                    .message.role != domain::Role::User)
+            return error_(id, "fork", "Invalid entry ID for forking");
+      }
+
+      auto const targetLeaf = at ? entryId : target->parentId;
+
+      // 新会话 = root->targetLeaf 路径 (持久化时另写文件)
+      std::string newFile;
+      if (store_) newFile = store_->writeBranch(session_, targetLeaf);
+
+      domain::Session next{infra::uuidv7(), session_.cwd()};
+      next.setParentSessionPath(session_.filePath().empty()
+                                   ? session_.id() + ".jsonl"
+                                   : session_.filePath());
+      next.setFilePath(newFile);
+      std::vector<domain::Entry> path;
+      for (std::string cur = targetLeaf; !cur.empty();) {
+         auto const* e = session_.findEntry(cur);
+         if (!e) break;
+         path.push_back(*e);
+         cur = e->parentId;
+      }
+      std::string parent;
+      for (auto const& e : path | std::views::reverse) {
+         auto copy     = e;
+         copy.parentId = parent;
+         parent = copy.id;
+         next.appendLoaded(std::move(copy));
+      }
+      next.markPersisted();
+      session_ = std::move(next);
+      emittedCount_ = session_.messages().size();
+
+      folly::dynamic data = folly::dynamic::object("cancelled", false);
+      if (!selectedText.empty()) data["text"] = selectedText;
+      return ok_(id, at ? "clone" : "fork", std::move(data));
+   }
+
+   auto switchSession(folly::dynamic const& id, std::string const& path)
+      -> folly::dynamic {
+      if (path.empty() || !store_)
+         return error_(id, "switch_session",
+                       std::format("Session file not found: {}", path));
+
+      std::optional<domain::Session> loaded;
+      std::string                    loadedPath;
+      store_->load(path, [&](domain::Session s, std::string fp) {
+         loaded     = std::move(s);
+         loadedPath = std::move(fp);
+      });
+      if (!loaded || loadedPath.empty())
+         return error_(id, "switch_session",
+                       "Session file is not a valid pi session");
+
+      session_ = std::move(*loaded);
+      emittedCount_ = session_.messages().size();
+      return ok_(id, "switch_session",
+                 folly::dynamic::object("cancelled", false));
    }
 
    // ---------- export_html ----------
@@ -332,150 +484,243 @@ private:
       std::ofstream f{path};
       f << "<!doctype html><meta charset=utf-8><title>"
         << session_.id() << "</title><pre>\n";
-      for (auto const& m : session_.messages()) {
+      for (auto const& m : session_.messages())
          f << "[" << roleToString(m.role) << "] " << m.text << "\n";
-      }
    }
 
    // ---------- entries / tree ----------
-   // 骨架: entry id 按消息下标合成 e-<n>, parentId 链式. 真实现里
-   // entry 是 session store 的持久化记录 (uuid).
-   static auto entryId(size_t i) -> std::string {
-      return "e-" + std::to_string(i);
-   }
-
-   auto entriesJson(folly::dynamic const& cmd) const -> folly::dynamic {
-      auto const& msgs = session_.messages();
-      size_t begin = 0;
-      if (cmd.count("since") && cmd["since"].isString()) {
-         auto const& since = cmd["since"].getString();
-         bool found = false;
-         for (size_t i = 0; i < msgs.size(); ++i) {
-            if (entryId(i) == since) { begin = i + 1; found = true; break; }
-         }
-         if (!found) {
-            // pi 行为: 未知 since id 是错误响应. 调用方需要 error 帧——
-            // 包一层 sentinel 让 handle() 转成 error.
-            return folly::dynamic::object("__error", "Entry not found");
-         }
+   auto getEntries(folly::dynamic const& id, folly::dynamic const& cmd) const
+      -> folly::dynamic {
+      auto const& entries = session_.entries();
+      size_t      begin   = 0;
+      if (auto since = strField(cmd, "since"); !since.empty()) {
+         auto const it = std::ranges::find_if(
+            entries, [&](domain::Entry const& e) { return e.id == since; });
+         if (it == entries.end())
+            return error_(id, "get_entries",
+                          std::format("Entry not found: {}", since));
+         begin = static_cast<size_t>(it - entries.begin()) + 1;
       }
-      auto entries = folly::dynamic::array();
-      for (size_t i = begin; i < msgs.size(); ++i) {
-         folly::dynamic e = folly::dynamic::object
-            ("type", "message")
-            ("id", entryId(i))
-            ("parentId", i == 0 ? folly::dynamic{} : folly::dynamic{entryId(i - 1)})
-            ("timestamp", "")
-            ("message", messageToJson(msgs[i]));
-         entries.push_back(std::move(e));
-      }
+      auto arr = folly::dynamic::array();
+      for (auto const& e : entries | std::views::drop(begin))
+         arr.push_back(entryToJson(e));
       folly::dynamic leaf;
-      if (!msgs.empty()) leaf = entryId(msgs.size() - 1);
-      return folly::dynamic::object("entries", std::move(entries))
-                                  ("leafId", leaf);
+      if (!session_.leafId().empty()) leaf = session_.leafId();
+      return ok_(id, "get_entries",
+                 folly::dynamic::object("entries", std::move(arr))
+                                       ("leafId", leaf));
    }
 
    auto treeJson() const -> folly::dynamic {
-      // 线性链 -> 单根树. SessionTreeNode: {entry, children[]}
-      auto const& msgs = session_.messages();
-      folly::dynamic leaf;
-      if (!msgs.empty()) leaf = entryId(msgs.size() - 1);
-      auto tree = folly::dynamic::array();
-      if (!msgs.empty()) {
-         // 自底向上建链
-         folly::dynamic node;
-         for (size_t i = msgs.size(); i-- > 0;) {
-            folly::dynamic e = folly::dynamic::object
-               ("type", "message")("id", entryId(i))
-               ("parentId", i == 0 ? folly::dynamic{}
-                                  : folly::dynamic{entryId(i - 1)})
-               ("timestamp", "")
-               ("message", messageToJson(msgs[i]));
-            folly::dynamic n = folly::dynamic::object("entry", std::move(e));
-            n["children"] = node.isNull() ? folly::dynamic::array()
-                                         : folly::dynamic::array(std::move(node));
-            node = std::move(n);
+      auto const& entries = session_.entries();
+
+      // 最新 label 条目: targetId -> {label, ts}
+      std::unordered_map<std::string,
+                         std::pair<std::string, std::string>> labels;
+      for (auto const& e : entries) {
+         if (auto const* le = std::get_if<domain::LabelEntry>(&e.payload)) {
+            if (le->clear) labels.erase(le->targetId);
+            else           labels[le->targetId] = {le->label, e.timestampIso};
          }
-         tree.push_back(std::move(node));
       }
+
+      // 建节点 map; roots = parentId 空/自指/父缺失
+      std::unordered_map<std::string, size_t> byId;
+      for (size_t i = 0; i < entries.size(); ++i) byId[entries[i].id] = i;
+
+      std::vector<std::vector<size_t>> children(entries.size());
+      std::vector<size_t>              roots;
+      for (size_t i = 0; i < entries.size(); ++i) {
+         auto const& p = entries[i].parentId;
+         auto        it = byId.find(p);
+         if (p.empty() || p == entries[i].id || it == byId.end())
+            roots.push_back(i);
+         else
+            children[it->second].push_back(i);
+      }
+
+      std::function<folly::dynamic(size_t)> build = [&](size_t i) {
+         folly::dynamic n = folly::dynamic::object
+            ("entry", entryToJson(entries[i]));
+         auto ch = folly::dynamic::array();
+         // children 按 timestamp 升序
+         auto idx = children[i];
+         std::ranges::sort(idx, {}, [&](size_t k) {
+            return entries[k].timestampIso;
+         });
+         for (auto c : idx) ch.push_back(build(c));
+         n["children"] = std::move(ch);
+         if (auto l = labels.find(entries[i].id); l != labels.end()) {
+            n["label"]          = l->second.first;
+            n["labelTimestamp"] = l->second.second;
+         }
+         return n;
+      };
+
+      std::ranges::sort(roots, {}, [&](size_t k) {
+         return entries[k].timestampIso;
+      });
+      auto tree = folly::dynamic::array();
+      for (auto r : roots) tree.push_back(build(r));
+
+      folly::dynamic leaf;
+      if (!session_.leafId().empty()) leaf = session_.leafId();
       return folly::dynamic::object("tree", std::move(tree))
-                                  ("leafId", leaf);
+                                   ("leafId", leaf);
    }
 
    // ---------- 状态序列化 ----------
+   static auto strField(folly::dynamic const& j, char const* k,
+                        std::string def = {}) -> std::string {
+      auto it = j.find(k);
+      return it != j.items().end() && it->second.isString()
+                ? it->second.getString() : std::move(def);
+   }
+   static auto boolField(folly::dynamic const& j, char const* k, bool def)
+      -> bool {
+      auto it = j.find(k);
+      return it != j.items().end() && it->second.isBool()
+                ? it->second.getBool() : def;
+   }
+   static auto squashWs(std::string s) -> std::string {
+      // [\r\n]+ -> " ", trim (pi appendSessionInfo)
+      auto out = std::string{};
+      out.reserve(s.size());
+      bool pending = false;
+      for (char c : s) {
+         if (c == '\r' || c == '\n') { pending = true; continue; }
+         if (pending && !out.empty()) out += ' ';
+         pending = false;
+         out += c;
+      }
+      while (!out.empty() && std::isspace(out.back())) out.pop_back();
+      auto const first = out.find_first_not_of(" \t");
+      return first == std::string::npos ? std::string{} : out.substr(first);
+   }
+
+   auto sessionName() const -> std::string {
+      // 最新 session_info entry 的 name
+      for (auto const& e : session_.entries() | std::views::reverse) {
+         if (auto const* si
+             = std::get_if<domain::SessionInfoEntry>(&e.payload))
+            return si->hasName ? si->name : std::string{};
+      }
+      return {};
+   }
+
    auto modelJson() const -> folly::dynamic {
+      auto input = folly::dynamic::array();
+      for (auto const& m : model_.input.empty()
+                                ? std::vector<std::string>{"text"}
+                                : model_.input)
+         input.push_back(m);
       return folly::dynamic::object
-         ("id", modelId_)("name", modelId_)
-         ("api", "mock")("provider", modelProvider_)
-         ("baseUrl", "")("reasoning", false)
-         ("input", folly::dynamic::array("text"))
+         ("id", model_.id)("name", model_.name.empty() ? model_.id : model_.name)
+         ("api", model_.api)("provider", model_.provider)
+         ("baseUrl", model_.baseUrl)("reasoning", model_.reasoning)
+         ("input", std::move(input))
          ("cost", folly::dynamic::object
-            ("input", 0)("output", 0)("cacheRead", 0)("cacheWrite", 0))
-         ("contextWindow", 200000)("maxTokens", 8192);
+            ("input", model_.cost.input)("output", model_.cost.output)
+            ("cacheRead", model_.cost.cacheRead)
+            ("cacheWrite", model_.cost.cacheWrite))
+         ("contextWindow", model_.contextWindow)
+         ("maxTokens", model_.maxTokens);
+   }
+
+   auto sessionFilePath() const -> std::string {
+      if (!session_.filePath().empty()) return session_.filePath();
+      return store_ ? store_->fileOf(session_) : std::string{};
    }
 
    auto sessionStateJson() const -> folly::dynamic {
       folly::dynamic d = folly::dynamic::object
-         ("model", modelJson())
          ("thinkingLevel", thinkingLevel_)
          ("isStreaming", false)("isCompacting", false)
          ("steeringMode", steeringMode_)("followUpMode", followUpMode_)
          ("sessionId", session_.id())
          ("autoCompactionEnabled", autoCompactionEnabled_)
-         ("messageCount", static_cast<int64_t>(session_.messages().size()))
-         ("pendingMessageCount", 0);
-      if (!sessionName_.empty()) d["sessionName"] = sessionName_;
+         ("messageCount",
+            static_cast<int64_t>(session_.messages().size()))
+         ("pendingMessageCount",
+            static_cast<int64_t>(steering_.size() + followUp_.size()));
+      if (!model_.id.empty()) d["model"] = modelJson();
+      if (auto const f = sessionFilePath(); !f.empty()) d["sessionFile"] = f;
+      if (auto n = sessionName(); !n.empty()) d["sessionName"] = n;
       return d;
    }
 
    auto sessionStatsJson() const -> folly::dynamic {
-      int64_t user = 0, assistant = 0, toolCalls = 0, toolResults = 0;
+      // pi: 全量 entry (全分支, 含被 compact 历史)
+      int64_t user = 0, assistant = 0, toolCalls = 0, toolResults = 0,
+              totalMessages = 0;
       int64_t tin = 0, tout = 0, tcacheR = 0, tcacheW = 0;
       double  cost = 0;
-      for (auto const& m : session_.messages()) {
-         switch (m.role) {
-            case domain::Role::User:      ++user; break;
-            case domain::Role::Assistant: ++assistant;
-               toolCalls += static_cast<int64_t>(m.toolCalls.size());
-               tin     += m.usage.input;     tout    += m.usage.output;
-               tcacheR += m.usage.cacheRead; tcacheW += m.usage.cacheWrite;
-               cost    += m.usage.cost.total;
-               break;
-            case domain::Role::Tool:      ++toolResults; break;
-            case domain::Role::System:    break;
+      auto addUsage = [&](domain::Usage const& u) {
+         tin += u.input;     tout    += u.output;
+         tcacheR += u.cacheRead; tcacheW += u.cacheWrite;
+         cost += u.cost.total;
+      };
+      for (auto const& e : session_.entries()) {
+         if (auto const* me
+             = std::get_if<domain::MessageEntry>(&e.payload)) {
+            ++totalMessages;
+            switch (me->message.role) {
+               case domain::Role::User:      ++user; break;
+               case domain::Role::Assistant: ++assistant;
+                  toolCalls += static_cast<int64_t>(
+                                 me->message.toolCalls.size());
+                  addUsage(me->message.usage);
+                  break;
+               case domain::Role::Tool:      ++toolResults;
+                  addUsage(me->message.usage);
+                  break;
+               default: break;
+            }
+         } else if (auto const* ue
+                    = std::get_if<domain::UsageRecordEntry>(&e.payload)) {
+            addUsage(ue->usage);
+         } else if (auto const* ce
+                    = std::get_if<domain::CompactionEntry>(&e.payload)) {
+            if (ce->hasUsage) addUsage(ce->usage);
+         } else if (auto const* be
+                    = std::get_if<domain::BranchSummaryEntry>(&e.payload)) {
+            if (be->hasUsage) addUsage(be->usage);
          }
       }
       auto tokens = folly::dynamic::object
          ("input", tin)("output", tout)("cacheRead", tcacheR)
-         ("cacheWrite", tcacheW)("total", tin + tout);
+         ("cacheWrite", tcacheW)
+         ("total", tin + tout + tcacheR + tcacheW);
       folly::dynamic d = folly::dynamic::object
-         ("sessionFile", session_.id() + ".jsonl")   // 骨架: 声明式路径
          ("sessionId", session_.id())
          ("userMessages", user)("assistantMessages", assistant)
          ("toolCalls", toolCalls)("toolResults", toolResults)
-         ("totalMessages", static_cast<int64_t>(session_.messages().size()))
+         ("totalMessages", totalMessages)
          ("tokens", std::move(tokens))("cost", cost);
-      if (!sessionName_.empty()) d["sessionName"] = sessionName_;
+      if (auto const f = sessionFilePath(); !f.empty()) d["sessionFile"] = f;
+      if (auto n = sessionName(); !n.empty()) d["sessionName"] = n;
       return d;
    }
 
-   AgentSessionService& service_;
-   domain::Session&          session_;
-   std::istream&             in_;
-   std::ostream&             out_;
+   AgentSessionService&   service_;
+   domain::Session&       session_;
+   domain::ISessionStore* store_;
+   std::istream&          in_;
+   std::ostream&          out_;
 
-   // RPC 会话状态骨架 (pi AgentSession 对应物)
-   std::string modelProvider_  = "mock";
-   std::string modelId_        = "mock-1";
-   std::string thinkingLevel_  = "off";
-   std::string steeringMode_   = "all";
-   std::string followUpMode_   = "all";
-   std::string sessionName_;
-   bool        autoCompactionEnabled_ = false;
-   bool        autoRetryEnabled_      = true;
-   size_t      emittedCount_          = 0;
+   // RPC 会话状态 (pi AgentSession 对应物)
+   domain::Model model_{/*id*/ "mock-1", /*name*/ "mock-1", /*api*/ "mock",
+                       /*provider*/ "mock", /*baseUrl*/ "", /*input*/ {"text"},
+                       /*cost*/ {}, /*contextWindow*/ 200000,
+                       /*maxTokens*/ 8192, /*reasoning*/ true};
+   std::string   thinkingLevel_         = "medium";
+   std::string   steeringMode_          = "one-at-a-time";
+   std::string   followUpMode_          = "one-at-a-time";
+   bool          autoCompactionEnabled_ = true;
+   bool          autoRetryEnabled_      = true;
    std::deque<std::string> steering_;
    std::deque<std::string> followUp_;
+   size_t        emittedCount_ = 0;   // 已发 message_* 的投影消息数
 };
 
 } // namespace pi::iface::rpc

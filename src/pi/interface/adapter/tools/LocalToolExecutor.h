@@ -6,6 +6,7 @@
 
 #include <pi/domain/tool/Tool.h>
 #include <pi/infra/process/Shell.h>
+#include <pi/infra/util/JsonSafe.h>
 
 namespace pi::iface::adapter {
 
@@ -43,10 +44,9 @@ private:
    // 工具入参是 JSON 串: 取 field 字段; 解不出就原样用 (模型可能给裸串).
    static auto jsonArg(std::string const& input, std::string const& field)
       -> std::string {
-      try {
-         auto j = folly::parseJson(input);
-         if (j.count(field) && j[field].isString()) return j[field].getString();
-      } catch (...) {}
+      if (auto j = infra::parseJsonSafe(input);
+          j && j->count(field) && j->at(field).isString())
+         return j->at(field).getString();
       return input;
    }
 

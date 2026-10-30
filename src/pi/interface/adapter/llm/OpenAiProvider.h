@@ -1,5 +1,9 @@
 #pragma once
 
+#include <format>
+
+#include <pi/infra/util/JsonSafe.h>
+
 #include <chrono>
 #include <string>
 
@@ -41,10 +45,59 @@ public:
 
 private:
    // ---------- 请求构造 ----------
+   // pi convertToLlm: 自定义角色转 user 文本.
+   static auto llmText(domain::Message const& m) -> std::string {
+      switch (m.role) {
+         case domain::Role::BashExecution: {
+            if (m.excludeFromContext) return {};
+            std::string t = "Ran `" + m.command + "`\n```\n"
+                          + (m.text.empty() ? std::string{"(no output)"}
+                                            : m.text)
+                          + "\n```";
+            if (m.cancelled)      t += "\n\n(command cancelled)";
+            else if (m.exitCode != -9999 && m.exitCode != 0)
+               t += "\n\nCommand exited with code "
+                  + std::to_string(m.exitCode);
+            if (m.truncated && !m.fullOutputPath.empty())
+               t += "\n\n[Output truncated. Full output: "
+                  + m.fullOutputPath + "]";
+            return t;
+         }
+         case domain::Role::Custom: {
+            if (!m.contentJson.empty()) return m.contentJson;
+            return m.text;
+         }
+         case domain::Role::BranchSummary:
+            return "The following is a summary of a branch that this "
+                   "conversation came back from:\n\n<summary>\n"
+                 + m.summary + "\n</summary>";
+         case domain::Role::CompactionSummary:
+            return "The conversation history before this point was "
+                   "compacted into the following summary:\n\n<summary>\n"
+                 + m.summary + "\n</summary>";
+         default: return m.text;
+      }
+   }
+
    auto buildBody(domain::CompletionRequest const& req) const -> folly::dynamic {
       auto input = folly::dynamic::array();
       for (auto const& m : req.messages) {
          switch (m.role) {
+            case domain::Role::BashExecution:
+            case domain::Role::Custom:
+            case domain::Role::BranchSummary:
+            case domain::Role::CompactionSummary: {
+               if (m.role == domain::Role::BashExecution
+                   && m.excludeFromContext) break;
+               auto t = llmText(m);
+               if (t.empty()) break;
+               input.push_back(folly::dynamic::object
+                  ("type", "message")("role", "user")
+                  ("content", folly::dynamic::array(
+                     folly::dynamic::object("type", "input_text")
+                                           ("text", std::move(t)))));
+               break;
+            }
             case domain::Role::System:
                input.push_back(folly::dynamic::object
                   ("type", "message")("role", "developer")
@@ -89,9 +142,10 @@ private:
 
       auto tools = folly::dynamic::array();
       for (auto const& t : req.tools) {
-         folly::dynamic params;
-         try { params = folly::parseJson(t.inputSchema); }
-         catch (...) { params = folly::dynamic::object("type", "object"); }
+         auto pj = infra::parseJsonSafe(t.inputSchema);
+         folly::dynamic params = pj
+            ? std::move(*pj)
+            : folly::dynamic::object("type", "object");
          tools.push_back(folly::dynamic::object
             ("type", "function")("name", t.name)
             ("description", t.description)("parameters", std::move(params))
@@ -107,15 +161,14 @@ private:
    // ---------- 响应解析 ----------
    auto parse(std::string const& raw, int64_t durationMs) const
       -> domain::CompletionResult {
-      folly::dynamic j;
-      try {
-         j = folly::parseJson(raw);
-      } catch (std::exception const& e) {
+      auto pj = infra::parseJsonSafe(raw);
+      if (pj.hasError()) {
          domain::Message err{domain::Role::Assistant, {}, {}, {}};
-         err.errorMessage = std::string{"provider: invalid json: "}
-                          + e.what();
+         err.errorMessage = std::format("provider: invalid json: {}",
+                                        pj.error());
          return {std::move(err), domain::StopReason::Error};
       }
+      auto const& j = *pj;
       if (j.count("error") && j["error"].isObject()) {
          domain::Message err{domain::Role::Assistant, {}, {}, {}};
          err.errorMessage = "provider error: "

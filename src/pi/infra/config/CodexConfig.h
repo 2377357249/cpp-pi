@@ -9,6 +9,8 @@
 
 #include <folly/json/json.h>
 
+#include <pi/infra/util/JsonSafe.h>
+
 namespace pi::infra {
 
 // ---------------------------------------------------------------------------
@@ -35,12 +37,11 @@ struct CodexConfig {
       if (c.apiKey.empty()) {
          std::ifstream f{home() + "/.codex/auth.json"};
          if (f) {
-            try {
-               auto j = folly::parseJson(
-                  std::string{std::istreambuf_iterator<char>{f}, {}});
-               if (j.count("OPENAI_API_KEY"))
-                  c.apiKey = j["OPENAI_API_KEY"].getString();
-            } catch (...) {}
+            auto j = infra::parseJsonSafe(
+               std::string{std::istreambuf_iterator<char>{f}, {}});
+            if (j && j->count("OPENAI_API_KEY")
+                && j->at("OPENAI_API_KEY").isString())
+               c.apiKey = j->at("OPENAI_API_KEY").getString();
          }
       }
       if (c.apiKey.empty()) return std::nullopt;
