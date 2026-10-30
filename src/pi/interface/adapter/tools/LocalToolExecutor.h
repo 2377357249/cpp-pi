@@ -22,6 +22,9 @@ public:
    explicit LocalToolExecutor(std::string cwd) : tools_{std::move(cwd)} {}
 
    void setSessionEnv(ToolSessionEnv env) { tools_.setSessionEnv(std::move(env)); }
+   void setEnvProvider(std::function<ToolSessionEnv()> f) {
+      tools_.setEnvProvider(std::move(f));
+   }
    void setAbortCheck(std::function<bool()> f) { tools_.setAbortCheck(std::move(f)); }
    void setShellPath(std::string p) { tools_.setShellPath(std::move(p)); }
    void setActiveTools(std::vector<std::string> names) {

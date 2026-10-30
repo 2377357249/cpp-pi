@@ -69,6 +69,10 @@ public:
    void setSessionEnv(ToolSessionEnv env) { env_ = std::move(env); }
    void setAbortCheck(std::function<bool()> f) { abortCheck_ = std::move(f); }
    void setShellPath(std::string p) { shellPath_ = std::move(p); }
+   // 运行期取值 (sessionFile 首 flush 后才有; thinkingLevel 可变)
+   void setEnvProvider(std::function<ToolSessionEnv()> f) {
+      envProvider_ = std::move(f);
+   }
 
    // ---------- 注册表 (createAllToolDefinitions) ----------
    auto definitions() const -> std::vector<domain::Tool> {
@@ -95,6 +99,20 @@ public:
       if (call.tool == "write") return wrap(execWrite(obj));
       if (call.tool == "edit")  return wrap(execEdit(obj));
       if (call.tool == "bash")  return wrap(execBash(obj));
+      // pi getPowerShellConfig: 非 Windows 直接报这个错
+      if (call.tool == "powershell") {
+#ifdef _WIN32
+         auto saved = shellPath_;
+         shellPath_ = "pwsh";
+         auto r = execBash(obj);
+         shellPath_ = std::move(saved);
+         return wrap(std::move(r));
+#else
+         return {std::string{
+                    "The powershell tool is only available on Windows."},
+                 {}, nullptr, true};
+#endif
+      }
       if (call.tool == "grep")  return wrap(execGrep(obj));
       if (call.tool == "find")  return wrap(execFind(obj));
       if (call.tool == "ls")    return wrap(execLs(obj));
@@ -429,7 +447,8 @@ private:
          timeoutMs = static_cast<int64_t>(ms);
       }
 
-      // env: PI_* 注入
+      // env: PI_* 注入 (pi resolveSpawnContext: exposeSessionEnvironment)
+      if (envProvider_) env_ = envProvider_();
       std::vector<std::pair<std::string, std::string>> env;
       if (!env_.sessionId.empty())       env.emplace_back("PI_SESSION_ID", env_.sessionId);
       if (!env_.sessionFile.empty())     env.emplace_back("PI_SESSION_FILE", env_.sessionFile);
@@ -838,7 +857,8 @@ private:
                   std::optional<std::string> const& globFilter,
                   std::vector<std::string>& out) {
       GitIgnoreStack ignore;
-      walkDir(root, "", ignore, [&](fs::path const& p, std::string_view rel) {
+      walkDir(root, "", ignore, false,
+              [&](fs::path const& p, std::string_view rel, bool) {
          if (globFilter) {
             auto const relPosix = std::string{rel};
             auto const base = fs::path{relPosix}.filename().string();
@@ -855,19 +875,22 @@ private:
                        std::string const& pattern, bool fullPath,
                        GitIgnoreStack& ignore, std::vector<std::string>& out,
                        size_t limit) {
-      walkDir(root, "", ignore, [&](fs::path const& p, std::string_view r) {
+      walkDir(root, "", ignore, true,
+              [&](fs::path const& p, std::string_view r, bool isDir) {
          if (out.size() >= limit) return;
-         auto const relPosix = std::string{r};
+         auto relPosix = std::string{r};
          bool hit = fullPath
             ? globMatch(pattern, relPosix)
             : globMatch(pattern, p.filename().string());
-         if (hit) out.push_back(relPosix);
+         if (hit) out.push_back(isDir ? relPosix + "/"
+                                      : std::move(relPosix));
       });
    }
 
+   // emitDirs=true 时目录也喂给 emit (fd 默认返回文件+目录)
    template <class F>
    void walkDir(std::string const& root, std::string const& rel,
-                GitIgnoreStack& ignore, F&& emit) {
+                GitIgnoreStack& ignore, bool emitDirs, F&& emit) {
       std::error_code ec;
       auto const dir = rel.empty() ? root : root + "/" + rel;
       // 本层 .gitignore 入栈 (baseDir 前缀作用域天然限到子树)
@@ -883,8 +906,12 @@ private:
          bool const isDir = fs::is_directory(p, ec);
          if (isDir && name == ".git") continue;         // rg/fd 恒跳过 .git
          if (ignore.isIgnored(childRel, isDir)) continue;
-         if (isDir) walkDir(root, childRel, ignore, emit);
-         else emit(p, childRel);
+         if (isDir) {
+            if (emitDirs) emit(p, childRel, true);
+            walkDir(root, childRel, ignore, emitDirs, emit);
+         } else {
+            emit(p, childRel, false);
+         }
       }
    }
 
@@ -974,7 +1001,8 @@ private:
    std::string     cwd_;
    ToolSessionEnv  env_;
    std::string     shellPath_;
-   std::function<bool()> abortCheck_;
+   std::function<bool()>            abortCheck_;
+   std::function<ToolSessionEnv()>  envProvider_;
 };
 
 } // namespace pi::iface::adapter

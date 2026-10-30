@@ -46,6 +46,9 @@ public:
         in_(in), out_(out) {}
 
    auto setModel(domain::Model m) -> void { model_ = std::move(m); }
+   auto model() const -> domain::Model const& { return model_; }
+   auto thinkingLevel() const -> std::string const& { return thinkingLevel_; }
+   auto sessionFile() const -> std::string { return sessionFilePath(); }
 
    int run() {
       for (std::string line; std::getline(in_, line);) {

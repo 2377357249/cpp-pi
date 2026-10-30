@@ -133,15 +133,15 @@
 
 | 工具 | 关键语义 | 状态 |
 |---|---|---|
-| read | offset/limit; 截断 2000行/50KB(head); 图片探测(4100B嗅探)+转码+resize; 无行号; notices `[Showing lines A-B of T. Use offset=B+1 to continue.]`; errors `ENOENT...`/`Offset N is beyond end of file (M lines total)` | ⬜ |
-| bash(工具) | schema 精确; spawn /bin/bash -c(或 sh); env+PI_* 注入; timeout 校验(≤0→`Invalid timeout: must be a finite number of seconds`; >2147483.647→`Invalid timeout: maximum is...`); tail 截断 2000行/50KB; temp `pi-bash-<hex>.log`; stdout+stderr 合并; `(no output)`; 非零→`Command exited with code N`+isError; structuredContent{output,truncated,fullOutputPath,exitCode,wallTimeMs?} 1MB 上限 | 🟡 简化 |
-| edit | edits[] 精确匹配→NFKC+trailing-space+dash/space 归一化 fuzzy; 多匹配/重叠/空 oldText 错误串精确; BOM/换行符保留; 反序应用; details{diff,patch,firstChangedLine?}; file-mutation-queue | ⬜ |
-| write | 覆盖+递归建目录; `Successfully wrote to <path>` | 🟡 |
-| grep | 外调 `rg --no-config --json --line-number --color=never --hidden` +ignore-case/fixed-strings/glob; context 自己实现; limit默认100; 输出 `path:N: line`/`path-N- ctx`; notices | ⬜ |
-| find | 外调 `fd`; `--glob --color=never --hidden --max-results`; `/`→`**/`规则; notices | ⬜ |
-| ls | 字母序(case-insensitive)+`/`目录后缀; limit 500; notices | ⬜ |
-| powershell | Windows only(非 win 执行时报 `only available on Windows`) | — |
-| 通用 | execute(toolCallId,params,signal,onUpdate)→{content,details,structuredContent?,usage?,isError?}; 抛错→isError+err.message; constrainedSampling json_schema:prefer; 嵌套调用上限 256 calls/8KB args/32KB total/500char err; 校验错误串 `Tool <name> not found`/`Operation aborted`/`Tool execution was blocked`/`Tool call "<name>" was not executed: the response hit the output token limit...` | 🟡 |
+| read | offset/limit; 截断 2000行/50KB(head); 图片探测(4100B嗅探)+转码+resize; 无行号; notices `[Showing lines A-B of T. Use offset=B+1 to continue.]`; errors `ENOENT...`/`Offset N is beyond end of file (M lines total)` | ✅ (resize/非视觉 note 未做) |
+| bash(工具) | schema 精确; spawn /bin/bash -c(或 sh); env+PI_* 注入; timeout 校验(≤0→`Invalid timeout: must be a finite number of seconds`; >2147483.647→`Invalid timeout: maximum is...`); tail 截断 2000行/50KB; temp `pi-bash-<hex>.log`; stdout+stderr 合并; `(no output)`; 非零→`Command exited with code N`+isError; structuredContent{output,truncated,fullOutputPath,exitCode,wallTimeMs?} 1MB 上限 | ✅ (structuredContent 不进 wire, codemode 专用) |
+| edit | edits[] 精确匹配→NFKC+trailing-space+dash/space 归一化 fuzzy; 多匹配/重叠/空 oldText 错误串精确; BOM/换行符保留; 反序应用; details{diff,patch,firstChangedLine?}; file-mutation-queue | ✅ (file-mutation-queue 未做) |
+| write | 覆盖+递归建目录; `Successfully wrote to <path>` | ✅ |
+| grep | 外调 `rg --no-config --json --line-number --color=never --hidden` +ignore-case/fixed-strings/glob; context 自己实现; limit默认100; 输出 `path:N: line`/`path-N- ctx`; notices | ✅ (原生 std::regex+遍历实现, 语义对齐) |
+| find | 外调 `fd`; `--glob --color=never --hidden --max-results`; `/`→`**/`规则; notices | ✅ (原生遍历, 目录匹配带 `/` 后缀) |
+| ls | 字母序(case-insensitive)+`/`目录后缀; limit 500; notices | ✅ |
+| powershell | Windows only(非 win 执行时报 `The powershell tool is only available on Windows.`) | ✅ |
+| 通用 | execute(toolCallId,params,signal,onUpdate)→{content,details,structuredContent?,usage?,isError?}; 抛错→isError+err.message; constrainedSampling json_schema:prefer; 嵌套调用上限 256 calls/8KB args/32KB total/500char err; 校验错误串 `Tool <name> not found`/`Operation aborted`/`Tool execution was blocked`/`Tool call "<name>" was not executed: the response hit the output token limit...` | 🟡 (嵌套上限/onUpdate 未做) |
 
 ## 8. LLM provider/API 面
 

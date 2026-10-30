@@ -133,8 +133,25 @@ int main(int argc, char** argv) {
             /*cost*/ {}, /*contextWindow*/ kDefaultContextWindow,
             /*maxTokens*/ kDefaultMaxTokens, /*reasoning*/ true});
       }
+      // pi resolveSpawnContext: bash 子进程注入 PI_* 会话环境
+      tools.setEnvProvider([&] {
+         auto const& m = frontend.model();
+         return pi::iface::adapter::ToolSessionEnv{
+            session.id(), frontend.sessionFile(),
+            m.provider, m.id, frontend.thinkingLevel()};
+      });
       return frontend.run();
    }
+
+   tools.setEnvProvider([&] {
+      return pi::iface::adapter::ToolSessionEnv{
+         session.id(),
+         store->fileOf(session),
+         codex && provider != "mock" ? std::string{"openai-codex"}
+                                     : std::string{"mock"},
+         codex && provider != "mock" ? codex->model : std::string{"mock-1"},
+         "medium"};
+   });
 
    std::puts("cpp-pi skeleton (DDD + DCI + trans-dsl). /q to quit.");
    for (std::string line;;) {
