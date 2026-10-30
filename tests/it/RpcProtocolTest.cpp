@@ -117,10 +117,13 @@ TEST(RpcMode, ShouldGetAvailableModels) {
 
 // == rpc.test.ts: "should get session stats" =============================
 TEST(RpcMode, ShouldGetSessionStats) {
-   auto frames = RpcHarness::run(
-      R"({"type":"prompt","message":"Hello"})" "\n"
-      R"({"type":"get_session_stats"})" "\n");
-   auto d = RpcHarness::response(frames, "get_session_stats")["data"];
+   // prompt 异步跑 turn —— 等 agent_end 再查 stats (pi 语义下同此确定性点)
+   auto p = RpcProc::spawn({});
+   p.send(R"({"type":"prompt","message":"Hello"})");
+   p.readUntil("agent_end");
+   p.send(R"({"type":"get_session_stats"})");
+   auto r = p.readResponse("get_session_stats");
+   auto const& d = r["data"];
    ASSERT_TRUE(d.isObject());
    EXPECT_FALSE(d.count("sessionFile"));   // in-memory 会话无文件
    EXPECT_TRUE(d.count("sessionId"));
@@ -161,25 +164,16 @@ TEST(RpcMode, ShouldExportToHtml) {
 
 // == rpc.test.ts: "should get last assistant text" =======================
 TEST(RpcMode, ShouldGetLastAssistantText) {
-   auto frames = RpcHarness::run(
-      R"({"type":"get_last_assistant_text"})" "\n"
-      R"({"type":"prompt","message":"test123"})" "\n"
-      R"({"type":"get_last_assistant_text"})" "\n");
-
-   auto resps = frames;
-   int n = 0;
-   for (auto const& f : resps) {
-      if (f["type"].getString() == "response" &&
-          f["command"].getString() == "get_last_assistant_text") {
-         ++n;
-         if (n == 1) EXPECT_TRUE(f["data"]["text"].isNull());      // 初始 null
-         if (n == 2) {
-            EXPECT_TRUE(f["data"]["text"].isString());
-            EXPECT_EQ(f["data"]["text"].getString(), "工具返回: echo: test123");
-         }
-      }
-   }
-   EXPECT_EQ(n, 2);
+   auto p = RpcProc::spawn({});
+   p.send(R"({"type":"get_last_assistant_text"})");
+   auto r1 = p.readResponse("get_last_assistant_text");
+   EXPECT_TRUE(r1["data"]["text"].isNull());      // 初始 null
+   p.send(R"({"type":"prompt","message":"test123"})");
+   p.readUntil("agent_end");
+   p.send(R"({"type":"get_last_assistant_text"})");
+   auto r2 = p.readResponse("get_last_assistant_text");
+   ASSERT_TRUE(r2["data"]["text"].isString());
+   EXPECT_EQ(r2["data"]["text"].getString(), "工具返回: echo: test123");
 }
 
 // == rpc.test.ts: "should execute bash command" ==========================
@@ -241,18 +235,18 @@ TEST(RpcMode, UnknownSinceIdIsErrorResponse) {
 
 // == rpc.test.ts: "should get session tree" ==============================
 TEST(RpcMode, ShouldGetSessionTree) {
-   auto frames = RpcHarness::run(
-      R"({"type":"prompt","message":"ok"})" "\n"
-      R"({"type":"get_entries"})" "\n"
-      R"({"type":"get_tree"})" "\n");
+   auto p = RpcProc::spawn({});
+   p.send(R"({"type":"prompt","message":"ok"})");
+   p.readUntil("agent_end");
+   p.send(R"({"type":"get_entries"})");
+   auto ge = p.readResponse("get_entries");
+   p.send(R"({"type":"get_tree"})");
+   auto gt = p.readResponse("get_tree");
 
-   auto entries = RpcHarness::response(frames, "get_entries")
-                     ["data"]["entries"];
-   auto leafId  = RpcHarness::response(frames, "get_entries")
-                     ["data"]["leafId"].getString();
-   auto tree    = RpcHarness::response(frames, "get_tree")["data"]["tree"];
-   auto treeLeaf = RpcHarness::response(frames, "get_tree")
-                      ["data"]["leafId"].getString();
+   auto const& entries  = ge["data"]["entries"];
+   auto const  leafId   = ge["data"]["leafId"].getString();
+   auto const& tree     = gt["data"]["tree"];
+   auto const  treeLeaf = gt["data"]["leafId"].getString();
    EXPECT_EQ(treeLeaf, leafId);
 
    // 单根, 链式下钻 id 序与 entries 一致
@@ -321,6 +315,41 @@ TEST(RpcMode, CompactBigSessionWritesEntry) {
    // get_entries 应出现 compaction entry
    auto entries = RpcHarness::ofType(frames, "response");
    (void)entries;
+}
+
+// == abort: 事务在下一个周期检查点退出 =======================================
+// prompt 的 bash sleep 期间发 abort -> 该轮工具照常收尾 (in-flight 不可杀),
+// 但 TurnDone 谓词看到旗标即退出 —— 不再产生第二轮 assistant 文本;
+// abort 响应恒 success (pi session.abort 同义).
+TEST(RpcMode, AbortStopsLoopAfterInFlightWork) {
+   auto p = RpcProc::spawn(
+      {"--tools", "read,bash,edit,write,grep,find,ls,echo"});
+   p.send(R"({"type":"prompt","message":"tool:bash:{\"command\":\"sleep 1\"}"})");
+   p.readResponse("prompt");
+   p.send(R"({"type":"abort"})");
+   // 帧序恒定: agent_end (turn 收尾时发出) 先于 abort 响应 (join 之后才发)
+   auto frames = p.readUntil("agent_end");
+   auto r = p.readResponse("abort");
+   EXPECT_TRUE(r["success"].getBool());
+   int assistants = 0, toolResults = 0;
+   for (auto const& m : frames["messages"]) {
+      if (m["role"].getString() == "assistant") ++assistants;
+      if (m["role"].getString() == "toolResult") ++toolResults;
+   }
+   EXPECT_EQ(assistants, 1);   // 只有发起 toolCall 的那条
+   EXPECT_EQ(toolResults, 1);  // in-flight bash 的真实结果
+   // abort 后再 prompt 能正常跑 (旗标在 startTurn 复位)
+   p.send(R"({"type":"prompt","message":"after abort"})");
+   auto f2 = p.readUntil("agent_end");
+   bool sawFinal = false;
+   for (auto const& m : f2["messages"])
+      if (m["role"].getString() == "assistant"
+          && m["content"].isArray())
+         for (auto const& b : m["content"])
+            if (b["type"].getString() == "text"
+                && b["text"].getString().find("工具返回") != std::string::npos)
+               sawFinal = true;
+   EXPECT_TRUE(sawFinal);
 }
 
 // == rpc-prompt-response-semantics: steer/follow_up -> queued + queue_update

@@ -32,6 +32,12 @@ struct ToolRunner {
       turn.pendingToolResults.clear();
       turn.toolsExpected = calls.size();
       for (auto const& call : calls) {
+         // pi: 中止后剩余调用不再执行, 回 "Operation aborted" isError 结果
+         if (turn.aborted()) {
+            onResult(domain::ToolResult{call.id, call.tool,
+                                        "Operation aborted", {}, "", -1, true});
+            continue;
+         }
          tools_.execute(call, [this](domain::ToolResult r) { onResult(std::move(r)); });
       }
       return true;

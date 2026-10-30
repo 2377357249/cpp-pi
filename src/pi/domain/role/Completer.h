@@ -42,7 +42,9 @@ struct Completer {
    auto settle() -> void {
       auto& turn = ROLE(TurnStateCtx);
       auto msg = turn.lastCompletion.message;
-      msg.stopReason = turn.lastCompletion.stopReason;
+      // pi: abort 到达时本次响应记 stopReason "aborted"
+      msg.stopReason = turn.aborted() ? domain::StopReason::Aborted
+                                    : turn.lastCompletion.stopReason;
       ROLE(SessionCtx).session.appendAssistant(std::move(msg));
    }
 

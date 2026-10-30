@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <optional>
 #include <string>
 
@@ -37,6 +38,11 @@ public:
       return out.value_or(domain::CompletionResult{
          domain::Message{domain::Role::Assistant, {}, {}, {}},
          domain::StopReason::Error});
+   }
+
+   // pi agent.abort(): 注入外部中止旗标 (RPC 前端持有的 atomic).
+   auto setAbortFlag(std::atomic<bool>& flag) -> void {
+      impl_.abortRequested = &flag;
    }
 
    auto runTurn(std::string userInput) -> TSL_NS::Status {

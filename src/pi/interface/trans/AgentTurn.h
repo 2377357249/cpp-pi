@@ -14,11 +14,13 @@
 
 namespace pi::iface {
 
-// 轮次结束谓词: 本次 completion 未再请求工具调用 (规则在 domain::TurnPolicy)
+// 轮次结束谓词: 本次 completion 未再请求工具调用 或 用户已中止
+// (规则在 domain::TurnPolicy; abort 旗标在 TurnStateCtx)
 struct TurnDone {
    auto operator()(TSL_NS::TransactionInfo const& info) -> bool {
       auto* turn = info.toRole<domain::TurnStateCtx>();
-      return domain::TurnPolicy::isFinished(turn->lastCompletion);
+      return turn->aborted()
+             || domain::TurnPolicy::isFinished(turn->lastCompletion);
    }
 };
 
