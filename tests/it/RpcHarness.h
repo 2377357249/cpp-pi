@@ -18,7 +18,9 @@ namespace pi::it {
 // 收 stdout 里每一行 JSON. 黑盒, 粒度 = 外部输入消息 -> 输出消息字段.
 // ---------------------------------------------------------------------------
 struct RpcHarness {
-   static auto run(std::string const& ndjsonInput) -> std::vector<folly::dynamic> {
+   static auto run(std::string const& ndjsonInput,
+                   std::string const& extraArgs = {})
+      -> std::vector<folly::dynamic> {
       auto base = std::string{"/tmp/cpp-pi-it-"} + std::to_string(::getpid())
                 + "-" + std::to_string(counter_++);
       auto in  = base + ".in";
@@ -27,8 +29,8 @@ struct RpcHarness {
       { std::ofstream{in} << ndjsonInput; }
 
       auto cmd = std::string{CPP_PI_BIN}
-               + " --mode rpc --provider mock --no-session < " + in
-               + " > " + out + " 2>/dev/null";
+               + " --mode rpc --provider mock --no-session " + extraArgs
+               + " < " + in + " > " + out + " 2>/dev/null";
       auto rc  = std::system(cmd.c_str());
       if (rc != 0) return {};
 
@@ -68,7 +70,9 @@ private:
 // ---------------------------------------------------------------------------
 class RpcProc {
 public:
-   static auto spawn() -> RpcProc {
+   // noSession=false 用于持久化测试: 调用方在 extraArgs 里传 --session-dir.
+   static auto spawn(std::vector<std::string> extraArgs = {},
+                     bool noSession = true) -> RpcProc {
       int inP[2], outP[2];
       RpcProc p;
       if (::pipe(inP) != 0 || ::pipe(outP) != 0) return p;
@@ -77,8 +81,14 @@ public:
          ::dup2(inP[0], 0);  ::dup2(outP[1], 1);
          ::close(inP[0]);  ::close(inP[1]);
          ::close(outP[0]); ::close(outP[1]);
-         ::execl(CPP_PI_BIN, CPP_PI_BIN, "--mode", "rpc",
-                 "--provider", "mock", "--no-session", nullptr);
+         std::vector<std::string> args{
+            CPP_PI_BIN, "--mode", "rpc", "--provider", "mock"};
+         if (noSession) args.push_back("--no-session");
+         for (auto& a : extraArgs) args.push_back(std::move(a));
+         std::vector<char*> argv;
+         for (auto& a : args) argv.push_back(a.data());
+         argv.push_back(nullptr);
+         ::execv(CPP_PI_BIN, argv.data());
          _exit(127);
       }
       ::close(inP[0]);

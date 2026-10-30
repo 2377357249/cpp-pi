@@ -35,8 +35,27 @@ constexpr int64_t kDefaultMaxTokens     = 8192;
 int main(int argc, char** argv) {
    bool        rpcMode   = false;
    bool        noSession = false;
+   bool        noTools   = false;
    std::string provider  = "auto";
    std::string sessionDir;
+   std::vector<std::string> toolsArg, excludeTools;
+   auto splitCsv = [](char const* csv) {
+      std::vector<std::string> out;
+      std::string cur;
+      for (char const* p = csv;; ++p) {
+         if (*p == ',' || *p == '\0') {
+            auto const b = cur.find_first_not_of(' ');
+            auto const e = cur.find_last_not_of(' ');
+            if (b != std::string::npos)
+               out.push_back(cur.substr(b, e - b + 1));
+            if (*p == '\0') break;
+            cur.clear();
+         } else {
+            cur += *p;
+         }
+      }
+      return out;
+   };
    for (int i = 1; i < argc; ++i) {
       if (std::strcmp(argv[i], "--mode") == 0 && i + 1 < argc &&
           std::strcmp(argv[i + 1], "rpc") == 0) {
@@ -47,6 +66,15 @@ int main(int argc, char** argv) {
          noSession = true;
       } else if (std::strcmp(argv[i], "--session-dir") == 0 && i + 1 < argc) {
          sessionDir = argv[++i];
+      } else if ((std::strcmp(argv[i], "--tools") == 0 ||
+                  std::strcmp(argv[i], "-t") == 0) && i + 1 < argc) {
+         toolsArg = splitCsv(argv[++i]);
+      } else if ((std::strcmp(argv[i], "--exclude-tools") == 0 ||
+                  std::strcmp(argv[i], "-xt") == 0) && i + 1 < argc) {
+         excludeTools = splitCsv(argv[++i]);
+      } else if (std::strcmp(argv[i], "--no-tools") == 0 ||
+                 std::strcmp(argv[i], "-nt") == 0) {
+         noTools = true;
       }
    }
 
@@ -80,7 +108,17 @@ int main(int argc, char** argv) {
    std::string cwd = ::getcwd(cwdBuf, sizeof cwdBuf) ? cwdBuf : std::string{};
 
    pi::domain::Session           session{pi::infra::uuidv7(), cwd};
-   pi::iface::adapter::LocalToolExecutor  tools;
+   pi::iface::adapter::LocalToolExecutor  tools{cwd};
+   // pi 默认激活集: read/bash/edit/write; echo 留给 mock 测试通道.
+   // --tools 替换默认集 (pi 语义: 普通名替换 DEFAULT_TOOL_NAMES);
+   // --exclude-tools 从结果里剔除; --no-tools 全禁.
+   std::vector<std::string> active =
+      toolsArg.empty()
+         ? std::vector<std::string>{"read", "bash", "edit", "write", "echo"}
+         : toolsArg;
+   for (auto const& x : excludeTools)
+      std::erase(active, x);
+   if (!noTools) tools.setActiveTools(active);
    pi::iface::AgentSessionService  service{
       session, *llm, tools, *store,
       "You are cpp-pi, a DDD + DCI + trans-dsl rewrite of pi."};

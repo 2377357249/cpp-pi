@@ -12,6 +12,22 @@ namespace pi::iface::adapter {
 // ---------------------------------------------------------------------------
 class MockLlmProvider : public domain::ILlmProvider {
 public:
+   // toolCall.arguments 是 JSON 串: 拼字符串字段时需要转义
+   static auto escapeJson(std::string_view s) -> std::string {
+      std::string out;
+      for (char c : s) {
+         switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n";  break;
+            case '\r': out += "\\r";  break;
+            case '\t': out += "\\t";  break;
+            default:   out += c;
+         }
+      }
+      return out;
+   }
+
    void complete(domain::CompletionRequest req, domain::CompletionHandler done) override {
       auto mk = [](std::string text) {
          domain::Message m{domain::Role::Assistant, std::move(text), {}, {}};
@@ -25,10 +41,22 @@ public:
          return;
       }
       auto const& input = req.messages.empty() ? std::string{} : req.messages.back().text;
-      // 前缀路由不同工具路径: "bash:<cmd>" / "unknown:<x>" / 默认 echo
+      // 前缀路由不同工具路径:
+      //   "bash:<cmd>" / "unknown:<x>" / "tool:<name>:<json>" / 默认 echo
       std::string tool = "echo", arg = input;
-      if (input.rfind("bash:", 0) == 0)    { tool = "bash";    arg = input.substr(5); }
+      if (input.rfind("bash:", 0) == 0) {
+         tool = "bash";
+         arg  = std::string{R"({"command":")"} + escapeJson(input.substr(5))
+                + "\"}";
+      }
       if (input.rfind("unknown:", 0) == 0) { tool = "no_such"; arg = input.substr(8); }
+      if (input.rfind("tool:", 0) == 0) {
+         auto const sep = input.find(':', 5);
+         if (sep != std::string::npos) {
+            tool = input.substr(5, sep - 5);
+            arg  = input.substr(sep + 1);
+         }
+      }
       auto msg = mk("我需要先调用 " + tool + " 工具");
       msg.toolCalls.push_back(domain::ToolCall{"call-1", tool, arg});
       done(domain::CompletionResult{std::move(msg),

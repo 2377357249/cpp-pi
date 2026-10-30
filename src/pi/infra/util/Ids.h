@@ -51,4 +51,15 @@ inline auto uuidv7() -> std::string {
                       (r2 >> 32) & 0xffff, r2 & 0xffffffffULL);
 }
 
+// n 个 hex 字符的随机串 (临时文件名等)
+inline auto randomHex(size_t n) -> std::string {
+   static thread_local std::mt19937_64 rng{std::random_device{}()};
+   std::string out;
+   out.reserve(n);
+   while (out.size() < n)
+      out += std::format("{:016x}", rng());
+   out.resize(n);
+   return out;
+}
+
 } // namespace pi::infra

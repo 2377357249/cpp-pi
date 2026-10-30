@@ -27,8 +27,9 @@ public:
       : impl_{session, llm, tools, store, std::move(systemPrompt)} {}
 
    auto runTurn(std::string userInput) -> TSL_NS::Status {
+      // unpersisted() 天然覆盖轮次间隙的命令 entry (sessionInfo/thinkingLevel)
+      // 和本轮 user 消息, 无需 turn 起点标界.
       impl_.session.appendUser(std::move(userInput));
-      impl_.session.beginTurn();
 
       MonitoredAgentTurn turn{};
       turn.updateUserContext(&impl_);

@@ -443,8 +443,8 @@ TEST(RpcMode, UnknownToolCallIsErrorResult) {
    auto const& m = tr[2]["message"];
    EXPECT_EQ(m["role"].getString(), "toolResult");
    EXPECT_TRUE(m["isError"].getBool());
-   EXPECT_TRUE(m["content"][0]["text"].getString()
-                  .find("unknown tool") != std::string::npos);
+   // pi: "Tool no_such not found"
+   EXPECT_EQ(m["content"][0]["text"].getString(), "Tool no_such not found");
 }
 
 // == CLI 模式 =============================================================

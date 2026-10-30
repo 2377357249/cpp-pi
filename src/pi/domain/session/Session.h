@@ -54,8 +54,7 @@ public:
       persistedUpTo_ = 0;
    }
 
-   // ---- 持久化窗口 (entry 粒度) ----
-   auto beginTurn() -> void { persistedUpTo_ = entries_.size(); }
+   // ---- 持久化窗口 (entry 粒度): 游标只在 flush 成功后前移 ----
    auto markPersisted() -> void { persistedUpTo_ = entries_.size(); }
    auto unpersisted() const -> std::vector<Entry> {
       return {entries_.begin() + static_cast<long>(persistedUpTo_),
