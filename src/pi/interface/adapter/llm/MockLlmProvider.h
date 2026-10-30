@@ -34,6 +34,14 @@ public:
          m.api = "mock"; m.provider = "mock"; m.model = "mock-1";
          return m;
       };
+      // compaction 摘要请求: system prompt 是 summarization assistant → 纯文本
+      if (req.systemPrompt.find("context summarization assistant")
+          != std::string::npos) {
+         done(domain::CompletionResult{
+            mk("## Goal\nmock summary of the conversation"),
+            domain::StopReason::Stop});
+         return;
+      }
       if (!req.messages.empty() && req.messages.back().role == domain::Role::Tool) {
          done(domain::CompletionResult{
             mk("工具返回: " + req.messages.back().text),

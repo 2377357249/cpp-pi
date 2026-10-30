@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include <event/impl/ConsecutiveEventInfo.h>
@@ -24,7 +25,19 @@ public:
                        domain::IToolExecutor& tools,
                        domain::ISessionStore& store,
                        std::string            systemPrompt)
-      : impl_{session, llm, tools, store, std::move(systemPrompt)} {}
+      : llm_{llm}
+      , impl_{session, llm, tools, store, std::move(systemPrompt)} {}
+
+   // 事务外一次性 completion (compaction 摘要等). provider 契约: 最终调一次
+   // done; 当前实现同步完成, 异步实现留待 EV 链路接入.
+   auto completeOnce(domain::CompletionRequest req) -> domain::CompletionResult {
+      std::optional<domain::CompletionResult> out;
+      llm_.complete(std::move(req),
+                    [&out](domain::CompletionResult r) { out = std::move(r); });
+      return out.value_or(domain::CompletionResult{
+         domain::Message{domain::Role::Assistant, {}, {}, {}},
+         domain::StopReason::Error});
+   }
 
    auto runTurn(std::string userInput) -> TSL_NS::Status {
       // unpersisted() 天然覆盖轮次间隙的命令 entry (sessionInfo/thinkingLevel)
@@ -48,6 +61,7 @@ public:
    auto impl() -> domain::AgentTurnImpl& { return impl_; }
 
 private:
+   domain::ILlmProvider& llm_;
    domain::AgentTurnImpl impl_;
 };
 

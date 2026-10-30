@@ -15,6 +15,7 @@
 
 #include <folly/json/json.h>
 
+#include <pi/domain/compaction/CompactionPolicy.h>
 #include <pi/domain/model/Model.h>
 #include <pi/domain/session/ISessionStore.h>
 #include <pi/domain/session/Session.h>
@@ -137,6 +138,129 @@ private:
          service_.runTurn(msg);
          emitTurnEvents();
       }
+   }
+
+   // ---------- compact (pi agent-session.compact + compaction.ts) ----------
+   auto runCompact(folly::dynamic const& id, std::string_view instructions)
+      -> folly::dynamic {
+      emit(folly::dynamic::object("type", "compaction_start")
+                                ("reason", "manual"));
+
+      // pi: 失败事件 result 是 undefined -> 序列化时整键省略
+      auto fail = [&](std::string_view msg) -> folly::dynamic {
+         emit(folly::dynamic::object("type", "compaction_end")
+                  ("reason", "manual")
+                  ("aborted", false)("willRetry", false)
+                  ("errorMessage",
+                   std::format("Compaction failed: {}", msg)));
+         return error_(id, "compact", msg);
+      };
+
+      auto const path = session_.branchEntries();
+      if (!path.empty()
+          && std::holds_alternative<domain::CompactionEntry>(
+                 path.back().payload))
+         return fail("Already compacted");
+      auto prep = domain::prepareCompaction(session_);
+      if (!prep) return fail("Nothing to compact (session too small)");
+
+      // LLM 摘要请求 (pi buildSummarizationContext: system + 单条 user)
+      std::string summarizeErr;
+      auto summarize = [&](std::string promptText,
+                           std::string_view label)
+         -> std::optional<domain::CompletionResult> {
+         domain::Message u{domain::Role::User, std::move(promptText), {}, {}};
+         auto r = service_.completeOnce(domain::CompletionRequest{
+            std::vector<domain::Message>{std::move(u)},
+            {},
+            std::string{domain::kSummarizationSystemPrompt}});
+         if (auto f = domain::summarizationFailure(r, label)) {
+            summarizeErr = *f;
+            return std::nullopt;
+         }
+         return r;
+      };
+
+      std::string   summary;
+      domain::Usage usage;
+      if (prep->isSplitTurn && !prep->turnPrefixMessages.empty()) {
+         std::string history = prep->previousSummary.empty()
+                                  ? "No prior history." : "";
+         bool haveHist = false;
+         if (!prep->messagesToSummarize.empty()) {
+            auto r = summarize(domain::buildSummarizationPrompt(
+                                  prep->messagesToSummarize,
+                                  prep->previousSummary, instructions),
+                               "Summarization");
+            if (!r) return fail(summarizeErr);
+            history  = r->message.text;
+            usage    = r->message.usage;
+            haveHist = true;
+         }
+         auto pr = summarize(domain::buildTurnPrefixPrompt(
+                                prep->turnPrefixMessages, instructions),
+                             "Turn prefix summarization");
+         if (!pr) return fail(summarizeErr);
+         summary = std::format("{}\n\n---\n\n**Turn Context (split turn):**\n\n{}",
+                               history, pr->message.text);
+         if (haveHist) {
+            usage.input += pr->message.usage.input;
+            usage.output += pr->message.usage.output;
+            usage.cacheRead += pr->message.usage.cacheRead;
+            usage.cacheWrite += pr->message.usage.cacheWrite;
+            usage.totalTokens += pr->message.usage.totalTokens;
+         } else usage = pr->message.usage;
+      } else {
+         auto r = summarize(domain::buildSummarizationPrompt(
+                               prep->messagesToSummarize,
+                               prep->previousSummary, instructions),
+                            "Summarization");
+         if (!r) return fail(summarizeErr);
+         summary = r->message.text;
+         usage   = r->message.usage;
+      }
+
+      // pi: summary += formatFileOperations; details={readFiles,modifiedFiles}
+      summary += domain::formatFileOperations(prep->filesRead,
+                                              prep->filesModified);
+      folly::dynamic readOnly = folly::dynamic::array();
+      for (auto const& f : prep->filesRead)
+         if (!prep->filesModified.contains(f)) readOnly.push_back(f);
+      folly::dynamic modified = folly::dynamic::array();
+      for (auto const& f : prep->filesModified) modified.push_back(f);
+      folly::dynamic details =
+         folly::dynamic::object("readFiles", std::move(readOnly))
+                               ("modifiedFiles", std::move(modified));
+
+      domain::CompactionEntry ce;
+      ce.summary          = summary;
+      ce.firstKeptEntryId = prep->firstKeptEntryId;
+      ce.tokensBefore     = prep->tokensBefore;
+      ce.detailsJson      = folly::toJson(details);
+      ce.usage            = usage;
+      ce.hasUsage         = true;
+      auto const& saved = session_.appendEntry(
+         domain::Entry{domain::EntryBase{}, std::move(ce)});
+      if (store_)
+         store_->append(session_, session_.unpersisted(),
+                        [](bool) {});
+      session_.markPersisted();
+
+      auto const estimatedAfter =
+         domain::estimateContextTokens(session_.messages());
+      folly::dynamic result = folly::dynamic::object
+         ("summary", summary)
+         ("firstKeptEntryId", prep->firstKeptEntryId)
+         ("tokensBefore", prep->tokensBefore)
+         ("estimatedTokensAfter", estimatedAfter)
+         ("usage", usageToJson(usage))
+         ("details", std::move(details));
+      emit(folly::dynamic::object("type", "compaction_end")
+               ("reason", "manual")("result", result)
+               ("aborted", false)("willRetry", false));
+      (void)saved;
+      emittedCount_ = session_.messages().size();   // 摘要不进消息事件流
+      return ok_(id, "compact", std::move(result));
    }
 
    // ---------- AgentEvent 流 ----------
@@ -351,14 +475,7 @@ private:
                        ("truncated", r.truncated));
       }
       if (type == "compact") {
-         auto const n = static_cast<int64_t>(session_.entries().size());
-         return ok_(id, "compact",
-                    folly::dynamic::object
-                       ("summary", std::format("mock compaction of {} entries", n))
-                       ("firstKeptEntryId", session_.leafId().empty()
-                          ? folly::dynamic(nullptr)
-                          : folly::dynamic(session_.leafId()))
-                       ("tokensBefore", n));
+         return runCompact(id, strField(cmd, "customInstructions"));
       }
       if (type == "export_html") {
          auto path = strField(cmd, "outputPath");

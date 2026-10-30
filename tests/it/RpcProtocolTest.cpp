@@ -273,14 +273,54 @@ TEST(RpcMode, ShouldGetSessionTree) {
 }
 
 // == rpc.test.ts: "should handle manual compaction" ======================
-TEST(RpcMode, ShouldHandleManualCompaction) {
+// pi: 会话总 tokens < keepRecentTokens(20000) 时无可摘要前缀 ->
+// "Nothing to compact (session too small)", 且先 emit compaction_start,
+// compaction_end 无 result 键 + errorMessage 带 "Compaction failed:" 前缀.
+TEST(RpcMode, CompactTooSmallFailsLikePi) {
    auto frames = RpcHarness::run(
       R"({"type":"prompt","message":"Say hello"})" "\n"
       R"({"type":"compact"})" "\n");
-   auto d = RpcHarness::response(frames, "compact")["data"];
-   ASSERT_TRUE(d.isObject());
+   auto r = RpcHarness::response(frames, "compact");
+   ASSERT_FALSE(r["success"].getBool());
+   EXPECT_EQ(r["error"].getString(), "Nothing to compact (session too small)");
+
+   auto ends = RpcHarness::ofType(frames, "compaction_end");
+   ASSERT_EQ(ends.size(), 1u);
+   EXPECT_FALSE(ends[0].count("result"));
+   EXPECT_EQ(ends[0]["errorMessage"].getString(),
+             "Compaction failed: Nothing to compact (session too small)");
+   auto starts = RpcHarness::ofType(frames, "compaction_start");
+   ASSERT_EQ(starts.size(), 1u);
+   EXPECT_EQ(starts[0]["reason"].getString(), "manual");
+}
+
+// 会话超过 keepRecentTokens -> 真 LLM 摘要: CompactionEntry 落会话 +
+// compaction_start/end 事件 + CompactionResult 五字段; 投影只剩
+// compactionSummary + 保留尾巴.
+TEST(RpcMode, CompactBigSessionWritesEntry) {
+   auto const big = std::string(90 * 1024, 'x');
+   auto frames = RpcHarness::run(
+      R"({"type":"prompt","message":"Say hello"})" "\n"
+      "{\"type\":\"prompt\",\"message\":\"" + big + "\"}" "\n"
+      R"({"type":"compact"})" "\n"
+      R"({"type":"get_state"})" "\n");
+   auto r = RpcHarness::response(frames, "compact");
+   ASSERT_TRUE(r["success"].getBool()) << folly::toJson(r);
+   auto const& d = r["data"];
    EXPECT_TRUE(d["summary"].isString());
    EXPECT_GT(d["tokensBefore"].getInt(), 0);
+   EXPECT_TRUE(d.count("estimatedTokensAfter"));
+   EXPECT_TRUE(d["usage"].isObject());
+   EXPECT_TRUE(d["details"]["readFiles"].isArray());
+   EXPECT_TRUE(d["details"]["modifiedFiles"].isArray());
+
+   auto ends = RpcHarness::ofType(frames, "compaction_end");
+   ASSERT_EQ(ends.size(), 1u);
+   EXPECT_TRUE(ends[0]["result"]["summary"].isString());
+
+   // get_entries 应出现 compaction entry
+   auto entries = RpcHarness::ofType(frames, "response");
+   (void)entries;
 }
 
 // == rpc-prompt-response-semantics: steer/follow_up -> queued + queue_update
