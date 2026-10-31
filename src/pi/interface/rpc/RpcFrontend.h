@@ -100,6 +100,7 @@ private:
          std::lock_guard lk{turnMu_};
          service_.runTurn(std::move(msg));
          emitTurnEvents();
+         maybeAutoCompact();
          for (;;) {
             drainQueues();
             std::lock_guard q{queueMu_};
@@ -196,23 +197,36 @@ private:
          emitQueueUpdate();
          service_.runTurn(std::move(msg));
          emitTurnEvents();
+         maybeAutoCompact();
       }
    }
 
    // ---------- compact (pi agent-session.compact + compaction.ts) ----------
-   auto runCompact(folly::dynamic const& id, std::string_view instructions)
-      -> folly::dynamic {
+   // reason ∈ {manual, threshold, overflow}; willRetry 仅 overflow 可为 true.
+   // errOut 带回 RPC 响应用的裸错误串; 事件 errorMessage 带 pi 前缀.
+   auto runCompactCore(std::string_view reason,
+                       std::string_view instructions, bool willRetry,
+                       std::string* errOut)
+      -> std::optional<folly::dynamic> {
       emit(folly::dynamic::object("type", "compaction_start")
-                                ("reason", "manual"));
+                                ("reason", std::string{reason}));
 
-      // pi: 失败事件 result 是 undefined -> 序列化时整键省略
-      auto fail = [&](std::string_view msg) -> folly::dynamic {
+      // pi: 失败事件 result 是 undefined -> 序列化时整键省略;
+      // errorMessage 前缀随 reason 变化 (manual: "Compaction failed:",
+      // threshold/overflow: "Auto-compaction failed:" /
+      // "Context overflow recovery failed:").
+      auto fail = [&](std::string_view msg)
+         -> std::optional<folly::dynamic> {
+         if (errOut) *errOut = std::string{msg};
+         std::string_view prefix =
+            reason == "manual"    ? "Compaction failed: "
+            : reason == "overflow" ? "Context overflow recovery failed: "
+                                   : "Auto-compaction failed: ";
          emit(folly::dynamic::object("type", "compaction_end")
-                  ("reason", "manual")
+                  ("reason", std::string{reason})
                   ("aborted", false)("willRetry", false)
-                  ("errorMessage",
-                   std::format("Compaction failed: {}", msg)));
-         return error_(id, "compact", msg);
+                  ("errorMessage", std::format("{}{}", prefix, msg)));
+         return std::nullopt;
       };
 
       auto const path = session_.branchEntries();
@@ -315,11 +329,48 @@ private:
          ("usage", usageToJson(usage))
          ("details", std::move(details));
       emit(folly::dynamic::object("type", "compaction_end")
-               ("reason", "manual")("result", result)
-               ("aborted", false)("willRetry", false));
+               ("reason", std::string{reason})("result", result)
+               ("aborted", false)("willRetry", willRetry));
       (void)saved;
       emittedCount_ = session_.messages().size();   // 摘要不进消息事件流
-      return ok_(id, "compact", std::move(result));
+      return result;
+   }
+
+   // pi _checkCompaction 自动 case 3: 阈值压缩 (无重试).
+   // usage 有效 → calculateContextTokens; error/零 usage → 全量估算.
+   // 早于最新压缩边界的 assistant 不重复触发.
+   auto maybeAutoCompact() -> void {
+      if (!autoCompactionEnabled_ || model_.contextWindow <= 0) return;
+      auto const msgs = session_.messages();
+      domain::Message const* lastA = nullptr;
+      for (auto const& m : msgs | std::views::reverse) {
+         if (m.role == domain::Role::Assistant) { lastA = &m; break; }
+      }
+      if (lastA == nullptr
+          || lastA->stopReason == domain::StopReason::Aborted) return;
+
+      for (auto const& e : session_.branchEntries() | std::views::reverse) {
+         if (!std::holds_alternative<domain::CompactionEntry>(e.payload))
+            continue;
+         if (lastA->timestampMs != 0
+             && lastA->timestampMs
+                   <= domain::isoToMs(e.timestampIso))
+            return;
+         break;
+      }
+
+      auto const& u = lastA->usage;
+      auto const direct = u.totalTokens != 0
+         ? u.totalTokens : u.input + u.output + u.cacheRead + u.cacheWrite;
+      auto const contextTokens =
+         (lastA->stopReason == domain::StopReason::Error || direct == 0)
+            ? domain::estimateContextTokens(msgs)
+            : direct;
+      if (contextTokens <= model_.contextWindow - domain::kReserveTokens)
+         return;
+      // pi _runAutoCompaction: prepare 先行, 失败静默 (不发 compaction_*)
+      if (!domain::prepareCompaction(session_)) return;
+      runCompactCore("threshold", "", false, nullptr);
    }
 
    // ---------- AgentEvent 流 ----------
@@ -569,7 +620,12 @@ private:
                        ("truncated", r.truncated));
       }
       if (type == "compact") {
-         return runCompact(id, strField(cmd, "customInstructions"));
+         std::string compactErr;
+         auto r = runCompactCore("manual",
+                                 strField(cmd, "customInstructions"),
+                                 false, &compactErr);
+         return r ? ok_(id, "compact", std::move(*r))
+                  : error_(id, "compact", compactErr);
       }
       if (type == "export_html") {
          auto path = strField(cmd, "outputPath");

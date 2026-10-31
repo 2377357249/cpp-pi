@@ -1,5 +1,6 @@
 #pragma once
 
+#include <charconv>
 #include <string>
 
 #include <pi/domain/llm/ILlmProvider.h>
@@ -49,6 +50,18 @@ public:
          return;
       }
       auto const& input = req.messages.empty() ? std::string{} : req.messages.back().text;
+      // "usage:<N>": 带 usage 的完成应答 —— 驱动自动压缩阈值测试
+      if (input.rfind("usage:", 0) == 0) {
+         int64_t n = 0;
+         std::from_chars(input.data() + 6,
+                         input.data() + input.size(), n);
+         auto m = mk("usage reply");
+         m.usage.totalTokens = n;
+         m.usage.input = n;
+         done(domain::CompletionResult{std::move(m),
+                                       domain::StopReason::Stop});
+         return;
+      }
       // 前缀路由不同工具路径:
       //   "bash:<cmd>" / "unknown:<x>" / "tool:<name>:<json>" / 默认 echo
       std::string tool = "echo", arg = input;

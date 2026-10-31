@@ -320,6 +320,52 @@ TEST(RpcMode, CompactBigSessionWritesEntry) {
 // == abort: 事务在下一个周期检查点退出 =======================================
 // prompt 的 bash sleep 期间发 abort -> 该轮工具照常收尾 (in-flight 不可杀),
 // 但 TurnDone 谓词看到旗标即退出 —— 不再产生第二轮 assistant 文本;
+// set_auto_compaction 语义: turn 收尾时 usage 越过
+// contextWindow(200000) - reserveTokens(16384) → 自动压缩
+// (pi _checkCompaction case 3, reason:"threshold", 不重试).
+TEST(RpcMode, AutoCompactionAtThresholdTriggers) {
+   auto p = RpcProc::spawn();
+   // 先铺 ~90KB 会话让 prepareCompaction 有合法切点
+   auto const big = std::string(90 * 1024, 'x');
+   p.send("{\"type\":\"prompt\",\"message\":\"" + big + "\"}");
+   p.readResponse("prompt");
+   p.readUntil("agent_end");
+   p.send(R"({"type":"prompt","message":"usage:190000"})");
+   p.readResponse("prompt");
+   p.readUntil("agent_end");
+   auto end = p.readUntil("compaction_end");
+   ASSERT_TRUE(end.isObject());
+   EXPECT_EQ(end["reason"].getString(), "threshold");
+   EXPECT_TRUE(end.count("result"));
+   EXPECT_FALSE(end["willRetry"].getBool());
+}
+
+// enabled:false → 同样条件下不发任何 compaction_* 事件.
+TEST(RpcMode, AutoCompactionDisabledSkipsCheck) {
+   auto p = RpcProc::spawn();
+   p.send(R"({"type":"set_auto_compaction","enabled":false})");
+   p.readResponse("set_auto_compaction");
+   // 同样铺大会话 —— 否则 prep 闸门静默也会让断言空过
+   auto const big = std::string(90 * 1024, 'x');
+   p.send("{\"type\":\"prompt\",\"message\":\"" + big + "\"}");
+   p.readResponse("prompt");
+   p.readUntil("agent_end");
+   p.send(R"({"type":"prompt","message":"usage:190000"})");
+   p.readResponse("prompt");
+   p.readUntil("agent_end");
+   p.send(R"({"type":"get_state"})");
+   bool sawCompaction = false;
+   for (;;) {
+      auto f = p.readFrame();
+      if (!f.isObject() || !f.count("type")) break;
+      if (f["type"].getString() == "response") break;   // get_state 响应
+      if (f["type"].getString().find("compaction")
+          != std::string::npos)
+         sawCompaction = true;
+   }
+   EXPECT_FALSE(sawCompaction);
+}
+
 // abort 响应恒 success (pi session.abort 同义).
 TEST(RpcMode, AbortStopsLoopAfterInFlightWork) {
    auto p = RpcProc::spawn(
