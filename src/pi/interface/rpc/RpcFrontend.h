@@ -374,6 +374,114 @@ private:
    }
 
    // ---------- AgentEvent 流 ----------
+   // pi agent-loop: assistant 流式生命周期帧 —
+   //   start → message_start{骨架}; text/thinking/toolcall_* → message_update
+   //   {usage, assistantMessageEvent(剥 partial)}; done/error → message_end{最终}.
+   // 增量序列由 ctx.streamLog 记录, 与 assistant 消息 1:1 顺序对齐.
+   static auto assistantSkeletonJson(domain::Message const& m)
+      -> folly::dynamic {
+      auto skel = m;
+      skel.text.clear();
+      skel.thinking.clear();
+      skel.toolCalls.clear();
+      skel.images.clear();
+      skel.detailsJson.clear();
+      skel.usage      = {};
+      skel.stopReason = domain::StopReason::Pending;
+      return messageToJson(skel);
+   }
+
+   // json-event.ts toJsonAssistantMessageEvent: 剥 partial;
+   // toolcall_start 展开 {id, toolName}; start/done/error 不上 update 帧.
+   static auto streamEventJson(domain::AssistantStreamEvent const& e)
+      -> folly::dynamic {
+      using T = domain::AssistantStreamType;
+      auto ci = [](folly::dynamic d, int i) {
+         d["contentIndex"] = i;
+         return d;
+      };
+      switch (e.type) {
+         case T::TextStart:
+            return ci(folly::dynamic::object("type", "text_start"),
+                      e.contentIndex);
+         case T::TextDelta:
+            return ci(folly::dynamic::object("type", "text_delta")
+                                           ("delta", e.delta), e.contentIndex);
+         case T::TextEnd:
+            return ci(folly::dynamic::object("type", "text_end")
+                                           ("content", e.delta), e.contentIndex);
+         case T::ThinkingStart:
+            return ci(folly::dynamic::object("type", "thinking_start"),
+                      e.contentIndex);
+         case T::ThinkingDelta:
+            return ci(folly::dynamic::object("type", "thinking_delta")
+                                           ("delta", e.delta), e.contentIndex);
+         case T::ThinkingEnd:
+            return ci(folly::dynamic::object("type", "thinking_end")
+                                           ("content", e.delta), e.contentIndex);
+         case T::ToolCallStart:
+            return ci(folly::dynamic::object("type", "toolcall_start")
+                                           ("id", e.toolCallId)
+                                           ("toolName", e.toolName),
+                      e.contentIndex);
+         case T::ToolCallDelta:
+            return ci(folly::dynamic::object("type", "toolcall_delta")
+                                           ("delta", e.delta), e.contentIndex);
+         case T::ToolCallEnd: {
+            folly::dynamic tc = folly::dynamic::object("type", "toolCall")
+               ("id", e.toolCall.id)("name", e.toolCall.tool)
+               ("arguments", inputToDynamic(e.toolCall.input));
+            return ci(folly::dynamic::object("type", "toolcall_end")
+                                           ("toolCall", std::move(tc)),
+                      e.contentIndex);
+         }
+         default: return folly::dynamic{};
+      }
+   }
+
+   // pi: tool_execution_start{toolCallId,toolName,args} →
+   //     tool_execution_end{toolCallId,toolName,result,isError,durationMs?}
+   // args 从前一条 assistant 的 toolCalls 按 id 找回; result = {content,details}.
+   auto emitToolExecFrames(std::vector<domain::Message> const& msgs,
+                           size_t idx) -> void {
+      auto const& m = msgs[idx];
+      folly::dynamic args = folly::dynamic::object();
+      for (size_t i = idx; i-- > 0;) {
+         if (msgs[i].role != domain::Role::Assistant) continue;
+         for (auto const& tc : msgs[i].toolCalls) {
+            if (tc.id == m.toolCallId) {
+               args = inputToDynamic(tc.input);
+               break;
+            }
+         }
+         break;
+      }
+      emit(folly::dynamic::object("type", "tool_execution_start")
+              ("toolCallId", m.toolCallId)("toolName", m.toolName)
+              ("args", std::move(args)));
+
+      auto content = folly::dynamic::array();
+      if (!m.text.empty())
+         content.push_back(folly::dynamic::object("type", "text")
+                                                ("text", m.text));
+      for (auto const& im : m.images)
+         content.push_back(folly::dynamic::object("type", "image")
+                                                ("data", im.data)
+                                                ("mimeType", im.mimeType));
+      folly::dynamic result = folly::dynamic::object("content",
+                                                   std::move(content));
+      if (!m.detailsJson.empty()) {
+         if (auto d = infra::parseJsonSafe(m.detailsJson))
+            result["details"] = *d;
+      }
+      folly::dynamic end = folly::dynamic::object
+                    ("type", "tool_execution_end")
+                    ("toolCallId", m.toolCallId)("toolName", m.toolName)
+                    ("result", std::move(result))("isError", m.isError);
+      if (m.durationMs >= 0) end["durationMs"] = m.durationMs;
+      emit(std::move(end));
+   }
+
    auto emitTurnEvents() -> void {
       auto const msgs = session_.messages();
       if (msgs.size() <= emittedCount_) return;
@@ -385,12 +493,31 @@ private:
       emit(folly::dynamic::object("type", "agent_start"));
       emit(folly::dynamic::object("type", "turn_start"));
 
+      auto const& streamLog = service_.impl().streamLog;
       auto toolResults = folly::dynamic::array();
       folly::dynamic    lastAssistant;
-      for (auto const& m : msgs | std::views::drop(emittedCount_)) {
-         auto mj = messageToJson(m);
-         emit(folly::dynamic::object("type", "message_start")
-                                    ("message", mj));
+      for (size_t i = emittedCount_; i < msgs.size(); ++i) {
+         auto const& m  = msgs[i];
+         auto const  mj = messageToJson(m);
+         if (m.role == domain::Role::Tool) emitToolExecFrames(msgs, i);
+         if (m.role == domain::Role::Assistant) {
+            emit(folly::dynamic::object("type", "message_start")
+                                       ("message",
+                                        assistantSkeletonJson(m)));
+            if (streamSeqConsumed_ < streamLog.size()) {
+               for (auto const& e : streamLog[streamSeqConsumed_]) {
+                  auto aej = streamEventJson(e);
+                  if (aej.isNull()) continue;
+                  emit(folly::dynamic::object("type", "message_update")
+                         ("usage", usageToJson(e.usage))
+                         ("assistantMessageEvent", std::move(aej)));
+               }
+               ++streamSeqConsumed_;
+            }
+         } else {
+            emit(folly::dynamic::object("type", "message_start")
+                                       ("message", mj));
+         }
          emit(folly::dynamic::object("type", "message_end")
                                     ("message", mj));
          if (m.role == domain::Role::Tool) toolResults.push_back(mj);
@@ -584,6 +711,8 @@ private:
             session_.setParentSessionPath(p);
          session_.setFilePath({});
          emittedCount_ = 0;
+         streamSeqConsumed_ = 0;
+         service_.impl().streamLog.clear();
          return ok_(id, "new_session",
                     folly::dynamic::object("cancelled", false));
       }
@@ -721,6 +850,8 @@ private:
       next.markPersisted();
       session_ = std::move(next);
       emittedCount_ = session_.messages().size();
+      streamSeqConsumed_ = 0;
+      service_.impl().streamLog.clear();
 
       folly::dynamic data = folly::dynamic::object("cancelled", false);
       if (!selectedText.empty()) data["text"] = selectedText;
@@ -745,6 +876,8 @@ private:
 
       session_ = std::move(*loaded);
       emittedCount_ = session_.messages().size();
+      streamSeqConsumed_ = 0;
+      service_.impl().streamLog.clear();
       return ok_(id, "switch_session",
                  folly::dynamic::object("cancelled", false));
    }
@@ -991,6 +1124,7 @@ private:
    std::deque<std::string> steering_;
    std::deque<std::string> followUp_;
    size_t        emittedCount_ = 0;   // 已发 message_* 的投影消息数
+   size_t        streamSeqConsumed_ = 0;  // 已回放的 assistant 流序列数
 };
 
 } // namespace pi::iface::rpc

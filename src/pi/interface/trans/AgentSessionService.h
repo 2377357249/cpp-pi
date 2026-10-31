@@ -31,9 +31,11 @@ public:
 
    // 事务外一次性 completion (compaction 摘要等). provider 契约: 最终调一次
    // done; 当前实现同步完成, 异步实现留待 EV 链路接入.
+   // 摘要路径的增量事件不上线 (pi 的摘要流不经 agent event 转发).
    auto completeOnce(domain::CompletionRequest req) -> domain::CompletionResult {
       std::optional<domain::CompletionResult> out;
       llm_.complete(std::move(req),
+                    [](domain::AssistantStreamEvent const&) {},
                     [&out](domain::CompletionResult r) { out = std::move(r); });
       return out.value_or(domain::CompletionResult{
          domain::Message{domain::Role::Assistant, {}, {}, {}},

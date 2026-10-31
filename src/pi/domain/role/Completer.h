@@ -24,13 +24,20 @@ struct Completer {
    Completer(domain::ILlmProvider& llm, domain::IToolExecutor& tools)
       : llm_(llm), tools_(tools) {}
 
-   // 发起 completion, 完成后经回调 post EV_LLM_DONE
+   // 发起 completion, 完成后经回调 post EV_LLM_DONE;
+   // 流式增量按到达顺序记入 streamLog (emitTurnEvents 回放为 message_update)
    auto begin() -> void {
       auto& sess = ROLE(SessionCtx);
+      auto& log  = ROLE(TurnStateCtx).streamLog;
+      log.emplace_back();
+      auto* seq = &log.back();
       llm_.complete(
          domain::CompletionRequest{sess.session.messages(),
                                    tools_.availableTools(),
                                    sess.systemPrompt},
+         [seq](domain::AssistantStreamEvent const& e) {
+            seq->push_back(e);
+         },
          [this](domain::CompletionResult r) {
             ROLE(TurnStateCtx).lastCompletion = std::move(r);
             ROLE(EventQueueCtx).post(EV_LLM_DONE, LlmDoneMsg{});

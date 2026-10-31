@@ -317,6 +317,95 @@ TEST(RpcMode, CompactBigSessionWritesEntry) {
    (void)entries;
 }
 
+// == P3 流式: message_update + tool_execution_* 帧序 ==========================
+// pi agent-loop: start→message_start{骨架content:[]}; delta系→message_update
+// {usage,assistantMessageEvent(剥partial)}; done/error→message_end 不上update.
+TEST(RpcMode, StreamingMessageUpdateFrames) {
+   auto p = RpcProc::spawn();
+   p.send(R"({"type":"prompt","message":"hello"})");
+   p.readResponse("prompt");
+   std::vector<folly::dynamic> frames;
+   for (;;) {
+      auto f = p.readFrame();
+      if (!f.isObject()) break;
+      frames.push_back(f);
+      if (f["type"].getString() == "agent_end") break;
+   }
+   auto typesOf = [&](size_t from, size_t to) {
+      std::vector<std::string> v;
+      for (size_t i = from; i < to && i < frames.size(); ++i) {
+         auto const& f = frames[i];
+         if (f["type"].getString() == "message_update")
+            v.push_back("mu:" + f["assistantMessageEvent"]["type"].getString());
+         else
+            v.push_back(f["type"].getString());
+      }
+      return v;
+   };
+   // 定位第一个 assistant message_start —— 其后必须接 toolcall 增量序列
+   size_t aStart = frames.size();
+   for (size_t i = 0; i < frames.size(); ++i) {
+      if (frames[i]["type"].getString() == "message_start"
+          && frames[i]["message"]["role"].getString() == "assistant") {
+         aStart = i;
+         break;
+      }
+   }
+   ASSERT_LT(aStart, frames.size());
+   // 骨架: 流开始的 assistant content 为空
+   EXPECT_TRUE(frames[aStart]["message"]["content"].empty());
+   // mock 路由 text@0 → toolcall@1: 6 个 update 帧后接 message_end
+   auto seg = typesOf(aStart + 1, aStart + 8);
+   ASSERT_EQ(seg.size(), 7u);
+   EXPECT_EQ(seg[0], "mu:text_start");
+   EXPECT_EQ(seg[1], "mu:text_delta");
+   EXPECT_EQ(seg[2], "mu:text_end");
+   EXPECT_EQ(seg[3], "mu:toolcall_start");
+   EXPECT_EQ(seg[4], "mu:toolcall_delta");
+   EXPECT_EQ(seg[5], "mu:toolcall_end");
+   EXPECT_EQ(seg[6], "message_end");
+   // toolcall_start 展开 {id,toolName}, 无 partial
+   auto tcStart = frames[aStart + 4]["assistantMessageEvent"];
+   EXPECT_EQ(tcStart["id"].getString(), "call-1");
+   EXPECT_EQ(tcStart["toolName"].getString(), "echo");
+   EXPECT_FALSE(tcStart.count("partial"));
+   // 每条 message_update 顶层携带 usage
+   for (auto const& f : frames)
+      if (f["type"].getString() == "message_update")
+         EXPECT_TRUE(f["usage"].isObject());
+   // tool_execution_* 帧: args/result/isError 齐全
+   auto starts = RpcHarness::ofType(frames, "tool_execution_start");
+   ASSERT_EQ(starts.size(), 1u);
+   EXPECT_EQ(starts[0]["toolCallId"].getString(), "call-1");
+   EXPECT_EQ(starts[0]["toolName"].getString(), "echo");
+   EXPECT_EQ(starts[0]["args"].getString(), "hello");
+   auto ends = RpcHarness::ofType(frames, "tool_execution_end");
+   ASSERT_EQ(ends.size(), 1u);
+   EXPECT_FALSE(ends[0]["isError"].getBool());
+   EXPECT_TRUE(ends[0]["result"]["content"].isArray());
+   // 第二条 assistant (文本路径): text_start/delta/end update 帧
+   size_t tStart = frames.size();
+   for (size_t i = aStart + 1; i < frames.size(); ++i) {
+      if (frames[i]["type"].getString() == "message_start"
+          && frames[i]["message"]["role"].getString() == "assistant") {
+         tStart = i;
+         break;
+      }
+   }
+   ASSERT_LT(tStart, frames.size());
+   std::vector<std::string> upd;
+   for (size_t i = tStart + 1; i < frames.size(); ++i) {
+      if (frames[i]["type"].getString() != "message_update") break;
+      upd.push_back(
+         frames[i]["assistantMessageEvent"]["type"].getString());
+   }
+   ASSERT_GE(upd.size(), 4u);
+   EXPECT_EQ(upd.front(), "text_start");
+   EXPECT_EQ(upd.back(), "text_end");
+   // done/error 不以 message_update 出现
+   EXPECT_EQ(std::ranges::count(upd, "done"), 0);
+}
+
 // == abort: 事务在下一个周期检查点退出 =======================================
 // prompt 的 bash sleep 期间发 abort -> 该轮工具照常收尾 (in-flight 不可杀),
 // 但 TurnDone 谓词看到旗标即退出 —— 不再产生第二轮 assistant 文本;

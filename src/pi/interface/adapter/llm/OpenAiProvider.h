@@ -34,13 +34,55 @@ public:
       , provider_(std::move(providerName)) {}
 
    void complete(domain::CompletionRequest req,
+                 domain::AssistantStreamHandler onEvent,
                  domain::CompletionHandler done) override {
       auto t0   = std::chrono::steady_clock::now();
       auto body = buildBody(req);
       auto resp = post(baseUrl_ + "/responses", folly::toJson(body));
       auto ms   = std::chrono::duration_cast<std::chrono::milliseconds>(
                      std::chrono::steady_clock::now() - t0).count();
-      done(parse(resp, ms));
+      // 非流式 HTTP: 拿到完整响应后合成 pi 增量序列 (SSE 真流式后续接).
+      auto r = parse(resp, ms);
+      domain::AssistantStreamEvent e{};
+      e.type = domain::AssistantStreamType::Start;
+      onEvent(e);
+      int idx = 0;
+      if (!r.message.text.empty()) {
+         e.contentIndex = idx;
+         e.type = domain::AssistantStreamType::TextStart;
+         onEvent(e);
+         e.type  = domain::AssistantStreamType::TextDelta;
+         e.delta = r.message.text;
+         onEvent(e);
+         e.type = domain::AssistantStreamType::TextEnd;
+         onEvent(e);
+         ++idx;
+      }
+      for (auto const& tc : r.message.toolCalls) {
+         e.contentIndex = idx;
+         e.delta.clear();
+         e.type = domain::AssistantStreamType::ToolCallStart;
+         e.toolCallId = tc.id;
+         e.toolName   = tc.tool;
+         onEvent(e);
+         e.type = domain::AssistantStreamType::ToolCallDelta;
+         e.toolCallId.clear(); e.toolName.clear();
+         e.delta = tc.input;
+         onEvent(e);
+         e.type = domain::AssistantStreamType::ToolCallEnd;
+         e.delta.clear();
+         e.toolCall = tc;
+         onEvent(e);
+         e.toolCall = {};
+         ++idx;
+      }
+      e.contentIndex = 0;
+      e.delta.clear();
+      e.type   = domain::AssistantStreamType::Done;
+      e.reason = r.stopReason;
+      e.usage  = r.message.usage;
+      onEvent(e);
+      done(std::move(r));
    }
 
 private:
