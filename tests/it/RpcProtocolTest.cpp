@@ -622,6 +622,32 @@ TEST(RpcPromptSemantics, SteerAndFollowUpAreQueued) {
    EXPECT_EQ(qu[1]["followUp"][0].getString(), "B");
 }
 
+// == 协程化冒烟: 慢速工具执行中 steer 仍能插队 (loop 不被阻塞) ===========
+TEST(RpcPromptSemantics, SteerDuringToolRunIsQueuedBeforeRunEnds) {
+   auto p = RpcProc::spawn(
+      {"--tools", "read,bash,edit,write,grep,find,ls,echo"});
+   p.send(R"({"type":"prompt","message":"tool:bash:{\"command\":\"sleep 1\"}"})");
+   p.readResponse("prompt");
+   p.send(R"({"type":"steer","message":"S"})");
+
+   // agent_end 之前必须看到 queue_update{steering:["S"]} + steer 响应
+   bool sawQueueUpdate = false, sawSteerResp = false;
+   for (;;) {
+      auto f = p.readFrame();
+      ASSERT_TRUE(f.isObject()) << "unexpected EOF before agent_end";
+      auto const t = f["type"].getString();
+      if (t == "queue_update" && f["steering"].size() == 1u
+          && f["steering"][0].getString() == "S") sawQueueUpdate = true;
+      if (t == "response" && f["command"].getString() == "steer")
+         sawSteerResp = true;
+      if (t == "agent_end") break;
+   }
+   EXPECT_TRUE(sawQueueUpdate);
+   EXPECT_TRUE(sawSteerResp);
+   // steer 被排干成第二轮 run
+   EXPECT_TRUE(p.readUntil("agent_end").isObject());
+}
+
 // == rpc-prompt-response-semantics: 队列在 prompt 完成后排干 ==============
 TEST(RpcPromptSemantics, QueuedMessagesDrainAfterRun) {
    auto frames = RpcHarness::run(

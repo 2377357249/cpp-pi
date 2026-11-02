@@ -74,6 +74,12 @@ public:
       envProvider_ = std::move(f);
    }
 
+   // env 快照必须在调用方 (loop) 线程解析 —— provider 读 ModelCtx,
+   // worker 线程上取会跨线程碰领域态. 快照一经取得, execute 路径纯读.
+   auto resolveEnv() const -> ToolSessionEnv {
+      return envProvider_ ? envProvider_() : env_;
+   }
+
    // ---------- 注册表 (createAllToolDefinitions) ----------
    auto definitions() const -> std::vector<domain::Tool> {
       return {
@@ -89,7 +95,9 @@ public:
    }
 
    // ---------- 执行 ----------
-   auto execute(domain::ToolCall const& call) -> ToolOutcome {
+   // env 由调用方解析传入 (默认 resolveEnv()) —— 并发执行时共享只读快照.
+   auto execute(domain::ToolCall const& call, ToolSessionEnv const& env)
+      -> ToolOutcome {
       auto args = infra::parseJsonSafe(call.input);
       folly::dynamic a = args ? *args : folly::dynamic::object();
       // 模型可能给裸串 (mock): 非对象按工具各异处理
@@ -98,15 +106,11 @@ public:
       if (call.tool == "read")  return wrap(execRead(obj, call.input));
       if (call.tool == "write") return wrap(execWrite(obj));
       if (call.tool == "edit")  return wrap(execEdit(obj));
-      if (call.tool == "bash")  return wrap(execBash(obj));
+      if (call.tool == "bash")  return wrap(execBash(obj, env, shellPath_));
       // pi getPowerShellConfig: 非 Windows 直接报这个错
       if (call.tool == "powershell") {
 #ifdef _WIN32
-         auto saved = shellPath_;
-         shellPath_ = "pwsh";
-         auto r = execBash(obj);
-         shellPath_ = std::move(saved);
-         return wrap(std::move(r));
+         return wrap(execBash(obj, env, "pwsh"));
 #else
          return {std::string{
                     "The powershell tool is only available on Windows."},
@@ -122,6 +126,10 @@ public:
                  + (obj.count("input") && obj["input"].isString()
                        ? obj["input"].getString() : call.input)};
       return {std::format("Tool {} not found", call.tool), {}, nullptr, true};
+   }
+
+   auto execute(domain::ToolCall const& call) -> ToolOutcome {
+      return execute(call, resolveEnv());
    }
 
 private:
@@ -428,7 +436,8 @@ private:
    // ==================================================================
    // bash — pi core/tools/bash.ts (+createLocalShellOperations)
    // ==================================================================
-   auto execBash(folly::dynamic const& args) -> ToolOr<ToolOutcome> {
+   auto execBash(folly::dynamic const& args, ToolSessionEnv const& sessionEnv,
+                 std::string const& shellPath) -> ToolOr<ToolOutcome> {
       if (aborted()) return abortError();
       auto const command = str(args, "command").value_or("");
       auto const timeoutS = num(args, "timeout");
@@ -448,13 +457,12 @@ private:
       }
 
       // env: PI_* 注入 (pi resolveSpawnContext: exposeSessionEnvironment)
-      if (envProvider_) env_ = envProvider_();
       std::vector<std::pair<std::string, std::string>> env;
-      if (!env_.sessionId.empty())       env.emplace_back("PI_SESSION_ID", env_.sessionId);
-      if (!env_.sessionFile.empty())     env.emplace_back("PI_SESSION_FILE", env_.sessionFile);
-      if (!env_.provider.empty())        env.emplace_back("PI_PROVIDER", env_.provider);
-      if (!env_.model.empty())           env.emplace_back("PI_MODEL", env_.model);
-      if (!env_.reasoningLevel.empty())  env.emplace_back("PI_REASONING_LEVEL", env_.reasoningLevel);
+      if (!sessionEnv.sessionId.empty())       env.emplace_back("PI_SESSION_ID", sessionEnv.sessionId);
+      if (!sessionEnv.sessionFile.empty())     env.emplace_back("PI_SESSION_FILE", sessionEnv.sessionFile);
+      if (!sessionEnv.provider.empty())        env.emplace_back("PI_PROVIDER", sessionEnv.provider);
+      if (!sessionEnv.model.empty())           env.emplace_back("PI_MODEL", sessionEnv.model);
+      if (!sessionEnv.reasoningLevel.empty())  env.emplace_back("PI_REASONING_LEVEL", sessionEnv.reasoningLevel);
 
       // cwd 不存在
       std::error_code ec;
@@ -466,7 +474,7 @@ private:
       OutputAccumulator acc{"pi-bash"};
       auto const started = std::chrono::steady_clock::now();
       auto r = infra::spawnShell(command,
-                                 shellPath_.empty() ? "/bin/bash" : shellPath_,
+                                 shellPath.empty() ? "/bin/bash" : shellPath,
                                  {.cwd = cwd_, .env = env,
                                   .timeoutMs = timeoutMs,
                                   .onData = [&](std::string_view d) {

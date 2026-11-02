@@ -14,30 +14,42 @@
 #include <pi/domain/AgentTurnImpl.h>
 #include <pi/domain/model/ModelCatalog.h>
 #include <pi/domain/session/ISessionStore.h>
+#include <pi/infra/async/EventLoop.h>
 
 namespace pi::iface {
 
 // ---------------------------------------------------------------------------
-// 应用服务: 持有 AgentTurnImpl(DCI 合流对象), 驱动 AgentTurn 事务 ——
-// start() 启动, 不断把事件队列里的协议事件喂给事务直到脱离 working 状态.
-// (RPC 模式下换成 SessionLoop 常驻事务 + 异步喂事件; CLI 下按轮驱动)
+// 应用服务: 持有 AgentTurnImpl(DCI 合流对象), 在 EventLoop owner 线程上
+// 驱动 AgentTurn 事务.
+//   startTurn 启动一轮 run 后立即返回 —— 事务在 WAIT_ON 处挂起, 异步
+//   源 (LLM/工具/存储) 的回调经适配器 marshal 回 loop 线程 post 事件,
+//   EventQueueCtx::onPost 钩子安排 deferred pump 恢复事务. 领域态只在
+//   loop 线程被触碰; pump 用 pumping_ 防重入 (post 可能发生在
+//   handleEvent 调用栈内).
 // ---------------------------------------------------------------------------
 class AgentSessionService {
 public:
+   using RunDoneHandler = std::function<void(TSL_NS::Status)>;
+
    AgentSessionService(domain::Session&       session,
-                       domain::ILlmProvider&  llm,
+                       domain::ILlmProvider&  turnLlm,
+                       domain::ILlmProvider&  oneShotLlm,
                        domain::IToolExecutor& tools,
                        domain::ISessionStore& store,
-                       std::string            systemPrompt)
-      : llm_{llm}
-      , impl_{session, llm, tools, store, std::move(systemPrompt)} {}
+                       std::string            systemPrompt,
+                       infra::EventLoop&      loop)
+      : oneShotLlm_{oneShotLlm}
+      , impl_{session, turnLlm, tools, store, std::move(systemPrompt)}
+      , loop_{loop} {
+      impl_.onPost = [this] { loop_.post([this] { pump(); }); };
+   }
 
    // 事务外一次性 completion (compaction 摘要等). provider 契约: 最终调一次
-   // done; 当前实现同步完成, 异步实现留待 EV 链路接入.
+   // done; 走同步 oneShotLlm_ —— 阻塞 loop 线程, 协程化留待 Compact proc.
    // 摘要路径的增量事件不上线 (pi 的摘要流不经 agent event 转发).
    auto completeOnce(domain::CompletionRequest req) -> domain::CompletionResult {
       std::optional<domain::CompletionResult> out;
-      llm_.complete(std::move(req),
+      oneShotLlm_.complete(std::move(req),
                     [](domain::AssistantStreamEvent const&) {},
                     [&out](domain::CompletionResult r) { out = std::move(r); });
       return out.value_or(domain::CompletionResult{
@@ -69,7 +81,6 @@ public:
    }
 
    // 返回错误串; nullopt = 切换成功. provider/modelId 必须命中目录.
-   // pi setThinkingLevel 钳制: 新模型不支持推理时 thinking 收敛 "off".
    auto setModel(std::string_view provider, std::string_view modelId)
       -> std::optional<std::string> {
       auto const* m = catalog_.find(provider, modelId);
@@ -79,7 +90,6 @@ public:
           && !providerChange_(m->provider))
          return std::format("No provider available for: {}", m->provider);
       impl_.activeModel = *m;
-      if (!m->reasoning) impl_.thinkingLevel = "off";
       return std::nullopt;
    }
 
@@ -118,14 +128,17 @@ public:
       providerChange_ = std::move(fn);
    }
 
+   auto running() const -> bool { return turn_.has_value(); }
+
    // pi runAgentLoop: agent_start → turn_start → 输入消息 message_* →
    // 事务化 inner loop (每轮 turn_* 边界由 Completer/TurnReporter 发射) →
-   // agent_end{messages: 本轮全部新消息}.
-   auto runTurn(std::string userInput) -> TSL_NS::Status {
+   // agent_end{messages: 本轮全部新消息}. 立即返回; 收尾经 onDone.
+   auto startTurn(std::string   userInput,
+                  RunDoneHandler onDone) -> void {
       // unpersisted() 天然覆盖轮次间隙的命令 entry (sessionInfo/thinkingLevel)
       // 和本轮 user 消息, 无需 turn 起点标界.
       auto& sink = *impl_.sink;
-      auto const baseIdx = impl_.session.messages().size();
+      baseIdx_   = impl_.session.messages().size();
       auto userMsg = impl_.session.appendUser(std::move(userInput));
 
       sink.agentStart();
@@ -139,32 +152,66 @@ public:
       impl_.streamingStarted = false;
       impl_.completionsSeen = 0;
 
-      MonitoredAgentTurn turn{};
-      turn.updateUserContext(&impl_);
+      onDone_ = std::move(onDone);
+      turn_.emplace();
+      turn_->updateUserContext(&impl_);
+      status_ = turn_->start();
+      pump();
+   }
 
-      auto status = turn.start();
-      while (TSL_NS::is_working_status(status) && !impl_.queue.empty()) {
-         auto& front = impl_.queue.front();
-         EV_NS::ConsecutiveEventInfo info{front.id, front.bytes.data(), front.size};
-         EV_NS::Event event{info};
-         status = turn.handleEvent(event);
-         impl_.queue.pop_front();
-      }
-
-      auto const msgs = impl_.session.messages();
-      sink.agentEnd(
-         std::vector<domain::Message>{msgs.begin() + baseIdx, msgs.end()},
-         /*willRetry=*/false);
-      return status;
+   // 同步版 (CLI/TUI worker 线程): 内嵌跑 loop 直到本轮 run 收尾.
+   auto runTurn(std::string userInput) -> TSL_NS::Status {
+      TSL_NS::Status st = TSL_NS::Result::SUCCESS;
+      startTurn(std::move(userInput),
+                [&st](TSL_NS::Status s) { st = s; });
+      loop_.runUntil([this] { return !running(); });
+      return st;
    }
 
    auto impl() -> domain::AgentTurnImpl& { return impl_; }
 
 private:
-   domain::ILlmProvider&  llm_;
+   // 泵送事务: 队列事件逐个喂 handleEvent 直到 working 队列空.
+   // 事务脱离 working 即 finish —— onDone 可能链式启动下一轮.
+   auto pump() -> void {
+      if (pumping_) return;
+      pumping_ = true;
+      while (turn_ && TSL_NS::is_working_status(status_)
+             && !impl_.queue.empty()) {
+         auto& front = impl_.queue.front();
+         EV_NS::ConsecutiveEventInfo info{front.id, front.bytes.data(),
+                                        front.size};
+         EV_NS::Event event{info};
+         status_ = turn_->handleEvent(event);
+         impl_.queue.pop_front();
+      }
+      pumping_ = false;
+      if (turn_ && !TSL_NS::is_working_status(status_)) finish();
+   }
+
+   auto finish() -> void {
+      auto const msgs = impl_.session.messages();
+      impl_.sink->agentEnd(
+         std::vector<domain::Message>{msgs.begin() + baseIdx_, msgs.end()},
+         /*willRetry=*/false);
+      auto st   = status_;
+      auto done = std::move(onDone_);
+      onDone_   = nullptr;
+      turn_.reset();          // 先于 onDone 复位 —— running() 在回调内已假
+      if (done) done(st);
+   }
+
+   domain::ILlmProvider&  oneShotLlm_;
    domain::AgentTurnImpl  impl_;
+   infra::EventLoop&      loop_;
    domain::ModelCatalog   catalog_;
    std::function<bool(std::string_view)> providerChange_;
+
+   std::optional<MonitoredAgentTurn> turn_;
+   TSL_NS::Status        status_  = TSL_NS::Result::SUCCESS;
+   RunDoneHandler        onDone_;
+   size_t                baseIdx_ = 0;
+   bool                  pumping_ = false;
 };
 
 } // namespace pi::iface

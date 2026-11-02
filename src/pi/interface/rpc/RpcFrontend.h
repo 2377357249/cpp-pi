@@ -8,7 +8,6 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
-#include <mutex>
 #include <optional>
 #include <ranges>
 #include <string>
@@ -23,6 +22,7 @@
 #include <pi/domain/session/ISessionStore.h>
 #include <pi/domain/session/Session.h>
 #include <pi/domain/session/SessionFork.h>
+#include <pi/infra/async/EventLoop.h>
 #include <pi/infra/process/Shell.h>
 #include <pi/infra/util/Ids.h>
 #include <pi/infra/util/JsonSafe.h>
@@ -47,11 +47,12 @@ public:
 
    RpcFrontend(AgentSessionService&   service,
                domain::Session&       session,
+               infra::EventLoop&      loop,
                domain::ISessionStore* store = nullptr,
                std::istream&          in  = std::cin,
                std::ostream&          out = std::cout)
       : service_(service), session_(session), store_(store),
-        in_(in), out_(out),
+        loop_(loop), in_(in), out_(out),
         sink_([this](folly::dynamic f) { emit(std::move(f)); }),
         compact_(service, session, store,
                  [this](folly::dynamic f) { emit(std::move(f)); }) {}
@@ -66,74 +67,124 @@ public:
    int run() {
       service_.setAbortFlag(abortRequested_);
       service_.setEventSink(sink_);
-      for (std::string line; std::getline(in_, line);) {
-         if (line.empty()) continue;
-         if (!line.empty() && line.back() == '\r') line.pop_back();
+      // stdin 是唯一自带线程的事件源 (阻塞 getline); 行+EOF 都经
+      // loop.post 回 owner 线程 —— 命令处理/事务/发射全在 loop 线程.
+      std::jthread reader([this] {
+         for (std::string line; std::getline(in_, line);)
+            loop_.post([this, line = std::move(line)] {
+               inbox_.push_back(std::move(line));
+               pumpCommands();
+            });
+         loop_.post([this] { eof_ = true; });
+      });
+      loop_.runUntil([this] {
+         return eof_ && inbox_.empty() && !busy_;
+      });
+      return 0;
+   }
+
+private:
+   // ---------- 并发模型 (pi: prompt 返回 started 后 turn 后台跑) ----------
+   // 单线程事件循环: stdin reader 线程只负责投递行; 命令按行序在
+   // pumpCommands 里处理 —— busy_ 时快路径命令 (steer/follow_up/prompt
+   // 排队语义) 就地消费, 其余堵在 inbox 头部等 turn 收尾 (等价旧
+   // turnMu_ 串行化 + 严格保序). abortRequested_ 仍是原子旗标:
+   // 写方包括未来的跨线程源.
+   std::atomic<bool>       abortRequested_{false};
+   std::deque<std::string> inbox_;
+   bool                    eof_     = false;
+   bool                    busy_    = false;   // run 或其队列排干链进行中
+   bool                    pumping_ = false;
+   infra::EventLoop&       loop_;
+
+   // pi: 这些命令先中止进行中的 run (compact 也 await this.abort()).
+   static auto isPreempt(std::string_view type) -> bool {
+      return type == "compact" || type == "new_session"
+             || type == "switch_session" || type == "fork"
+             || type == "clone";
+   }
+
+   // 按行序处理 inbox 头部. busy_ 时非快路径命令在头部阻塞 ——
+   // 后续命令仍在它们之后排队 (pi 单事件循环同义).
+   auto pumpCommands() -> void {
+      if (pumping_) return;
+      pumping_ = true;
+      while (!inbox_.empty()) {
+         // 拷贝而非移动: break 分支要把原样留在头部等空闲
+         auto line = inbox_.front();
+         if (line.empty()) { inbox_.pop_front(); continue; }
+         if (line.back() == '\r') line.pop_back();
 
          auto parsed = infra::parseJsonSafe(line);
          if (parsed.hasError()) {
             emit(error_(folly::dynamic{}, "parse",
                         std::format("Failed to parse command: {}",
                                     parsed.error())));
+            inbox_.pop_front();
             continue;
          }
+         auto const type = strField(*parsed, "type");
+
+         if (busy_) {
+            // 快路径: 能插进运行中 run 的命令就地分发
+            if (type == "steer" || type == "follow_up"
+                || type == "prompt") {
+               auto resp = handle(*parsed);
+               if (!resp.isNull()) emit(resp);
+               inbox_.pop_front();
+               continue;
+            }
+            // abort/抢占类置旗, 响应延后到 run 收尾 (pi await run 同义)
+            if (type == "abort" || isPreempt(type))
+               abortRequested_ = true;
+            break;
+         }
+
+         if (type == "abort") {
+            abortRequested_ = true;
+            emit(ok_(idOf(*parsed), "abort"));
+            inbox_.pop_front();
+            continue;
+         }
+         if (isPreempt(type)) abortRequested_ = true;
          auto resp = handle(*parsed);
          if (!resp.isNull()) emit(resp);   // prompt 的响应在 handle 内已发
+         inbox_.pop_front();
       }
-      joinTurn();   // 输入关闭时等 in-flight turn 收尾
-      return 0;
-   }
-
-private:
-   // ---------- 并发模型 (pi: prompt 返回 started 后 turn 后台跑) ----------
-   // emitMu_: NDJSON 输出不交错; turnMu_: session_ 串行化,
-   //   持锁单位=整轮事务 (会话读命令遇忙则等到 turn 收尾);
-   // queueMu_: steering_/followUp_ 短临界区 (steer 必须能插进运行中的 turn);
-   // abortRequested_: 事务周期检查的中止旗标 —— abort 不拿任何互斥.
-   // 锁序: turnMu_ → queueMu_ → emitMu_ (反向不得持有).
-   std::mutex        emitMu_;
-   std::mutex        turnMu_;
-   std::mutex        queueMu_;
-   std::atomic<bool> abortRequested_{false};
-   std::atomic<bool> turnRunning_{false};
-   std::thread       turnThread_;
-
-   auto joinTurn() -> void {
-      if (turnThread_.joinable()) turnThread_.join();
-   }
-
-   // worker 侧驱动: turnMu_ 贯穿 事务+事件; 之后清旗+排干循环 —
-   // "flag=false" 与"队列为空"在同一 queueMu_ 临界区判定, 与主线程
-   // push 互斥, 不会出现"已退出 drain 后才有新排队"的滞留窗口.
-   auto runTurnWorker(std::string msg) -> void {
-      {
-         std::lock_guard lk{turnMu_};
-         service_.runTurn(std::move(msg));
-         compact_.maybeAutoCompact();
-         for (;;) {
-            drainQueues();
-            std::lock_guard q{queueMu_};
-            if ((steering_.empty() && followUp_.empty())
-                || abortRequested_) {
-               turnRunning_ = false;
-               break;
-            }
-         }
-      }
-      turnRunning_ = false;
+      pumping_ = false;
    }
 
    auto startTurn(std::string msg) -> void {
-      joinTurn();
       abortRequested_ = false;
-      turnRunning_    = true;
-      turnThread_ = std::thread(&RpcFrontend::runTurnWorker, this,
-                                std::move(msg));
+      busy_           = true;
+      service_.startTurn(std::move(msg), [this](auto) { onRunDone(); });
+   }
+
+   // 一轮 run 收尾 (service 的 RunDoneHandler, loop 线程):
+   // pi: 阈值压缩检查 → steering 先于 followUp 排干 (abort 旗标下
+   // 保留剩余队列) → 空闲后放行 inbox 阻塞命令.
+   auto onRunDone() -> void {
+      compact_.maybeAutoCompact();
+      if (!abortRequested_ && (!steering_.empty() || !followUp_.empty())) {
+         std::string msg;
+         if (!steering_.empty()) {
+            msg = std::move(steering_.front());
+            steering_.pop_front();
+         } else {
+            msg = std::move(followUp_.front());
+            followUp_.pop_front();
+         }
+         emitQueueUpdate();
+         service_.startTurn(std::move(msg),
+                            [this](auto) { onRunDone(); });
+         return;
+      }
+      busy_ = false;
+      pumpCommands();
    }
 
    // ---------- 协议帧 ----------
    auto emit(folly::dynamic const& obj) -> void {
-      std::lock_guard lk{emitMu_};
       out_ << folly::toJson(obj) << '\n' << std::flush;
    }
 
@@ -174,9 +225,8 @@ private:
       return r;
    }
 
-   // ---------- 队列 (queueMu_ 短临界区) ----------
+   // ---------- 队列 ----------
    auto emitQueueUpdate() -> void {
-      std::lock_guard lk{queueMu_};
       auto steering = folly::dynamic::array();
       auto followUp = folly::dynamic::array();
       for (auto const& s : steering_)  steering.push_back(s);
@@ -186,32 +236,9 @@ private:
                                  ("followUp", std::move(followUp)));
    }
 
-   // run 结束后排干队列: steering 先于 followUp; 中止旗标下保留剩余队列
-   // (pi abort: 中止当前 run, 排队消息留给下一轮). worker 持 turnMu_ 调用.
-   auto drainQueues() -> void {
-      for (;;) {
-         std::string msg;
-         {
-            std::lock_guard lk{queueMu_};
-            if ((steering_.empty() && followUp_.empty())
-                || abortRequested_) break;
-            if (!steering_.empty()) {
-               msg = std::move(steering_.front());
-               steering_.pop_front();
-            } else {
-               msg = std::move(followUp_.front());
-               followUp_.pop_front();
-            }
-         }
-         emitQueueUpdate();
-         service_.runTurn(std::move(msg));
-         compact_.maybeAutoCompact();
-      }
-   }
-
    // ---------- 命令分发 ----------
-   // 无锁快路径: abort (atomic+join) / steer|follow_up (queueMu_) ——
-   // 必须能插进运行中的 turn; 其余命令 turnMu_ 与 worker 串行.
+   // 只在 loop 线程被 pumpCommands 调用; busy_/队列排序由它把守,
+   // abort/抢占的置旗在 pumpCommands 完成 (pi: 须等 run 空转才响应).
    auto handle(folly::dynamic const& cmd) -> folly::dynamic {
       auto const id   = idOf(cmd);
       auto const type = strField(cmd, "type");
@@ -225,19 +252,9 @@ private:
          return r;
       }
 
-      // pi session.abort(): 请求中止并等 run 空转; 响应恒 success
-      if (type == "abort") {
-         abortRequested_ = true;
-         joinTurn();
-         return ok_(id, "abort");
-      }
-
       if (type == "steer" || type == "follow_up") {
-         {
-            std::lock_guard lk{queueMu_};
-            (type == "steer" ? steering_ : followUp_)
-               .push_back(strField(cmd, "message"));
-         }
+         (type == "steer" ? steering_ : followUp_)
+            .push_back(strField(cmd, "message"));
          emitQueueUpdate();
          return ok_(id, type,
                     folly::dynamic::object("disposition", "queued"));
@@ -246,11 +263,8 @@ private:
       if (type == "prompt") {
          auto msg = strField(cmd, "message");
          // pi: 运行中 prompt 排队 (followUp 通道), disposition "queued"
-         if (turnRunning_) {
-            {
-               std::lock_guard lk{queueMu_};
-               followUp_.push_back(std::move(msg));
-            }
+         if (busy_) {
+            followUp_.push_back(std::move(msg));
             emitQueueUpdate();
             emit(ok_(id, "prompt",
                      folly::dynamic::object("disposition", "queued")));
@@ -261,17 +275,6 @@ private:
          startTurn(std::move(msg));
          return folly::dynamic{};
       }
-
-      // pi: 这些命令先中止进行中的 run (compact 也 await this.abort()).
-      // 在 turnMu_ 前置旗+join —— 锁内 join 会与持有它的 worker 互等死锁.
-      if (type == "compact" || type == "new_session"
-          || type == "switch_session" || type == "fork" || type == "clone") {
-         abortRequested_ = true;
-         joinTurn();
-      }
-
-      // 其余命令与 worker turn 串行 (pi 单事件循环同义).
-      std::lock_guard lk{turnMu_};
 
       if (type == "get_state") {
          return ok_(id, "get_state", sessionStateJson());

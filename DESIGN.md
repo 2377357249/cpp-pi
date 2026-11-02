@@ -39,6 +39,22 @@
 - **传输事件**（infra 内部）：SSE chunk、fd 就绪、stdin 行。infra 内部消化后经回调翻译为协议事件。
 - 领域事件（`TurnCompleted` 等，给审计/遥测）以后再加，归 domain。
 
+## 3.4 并发模型（单 loop 线程 + worker 池）
+
+- **`infra::EventLoop`**（`infra/async/`）：唯一的事务/领域线程。`post()` 线程安全，
+  `runUntil(done)` 只能由 owner 线程调用——所有 role/context/sink/Session 访问都在
+  loop 线程，**领域态零锁**。
+- **`infra::ThreadPool`**：收容同步阻塞原语（`curl_easy_perform`/`spawnMerged`/文件
+  扫描）。适配器把回调 marshal 回 loop：`AsyncLlmProvider`（llmPool×1）与
+  `LocalToolExecutor::setAsync`（toolPool×N，真并行 tool calls）。
+- **泵送**：`EventQueueCtx::onPost` → `loop.post(pump)`，延迟投递绝不重入
+  `handleEvent`；`AgentSessionService::startTurn` 返回即挂起，`runTurn` 保留同步
+  包装（CLI/TUI worker）。
+- **前端**：`RpcFrontend` 无 turn 线程——stdin reader jthread 投递行，`inbox_`
+  按序把守（busy 时 steer/follow_up/prompt 插队，其余堵头部=旧 turnMu_ 串行化），
+  `busy_` 覆盖 run+排干链。shutdown 顺序：loop 最先声明（最后析构），池先于其
+  引用的对象析构 join。
+
 ## 3.5 领域规则回 domain（不漂在 role/action 里）
 
 - `domain/turn/TurnPolicy.h`：turn 是否结束/要不要工具 的统一判定。

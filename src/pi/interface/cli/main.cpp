@@ -9,8 +9,11 @@
 #include <pi/interface/trans/AgentSessionService.h>
 #include <pi/domain/session/ISessionStore.h>
 #include <pi/domain/session/Session.h>
+#include <pi/infra/async/EventLoop.h>
+#include <pi/infra/async/ThreadPool.h>
 #include <pi/infra/config/CodexConfig.h>
 #include <pi/infra/util/Ids.h>
+#include <pi/interface/adapter/llm/AsyncLlmProvider.h>
 #include <pi/interface/adapter/llm/LlmProviderMux.h>
 #include <pi/interface/adapter/llm/MockLlmProvider.h>
 #include <pi/interface/adapter/llm/OpenAiProvider.h>
@@ -112,7 +115,6 @@ int main(int argc, char** argv) {
       LOG_INFO(pi::infra::log::logger(), "provider: openai-codex base={}",
                codex->baseUrl);
    }
-   auto& llm = mux;
 
    // 会话存储: 默认 JSONL 落 agentDir (--session-dir 可覆盖); --no-session
    // 走纯内存 (测试/一次性会话).
@@ -126,6 +128,15 @@ int main(int argc, char** argv) {
    char cwdBuf[4096];
    std::string cwd = ::getcwd(cwdBuf, sizeof cwdBuf) ? cwdBuf : std::string{};
 
+   // ---------- 异步装配: 单 loop 线程 + 两个 worker 池 ----------
+   // loop 最先声明 (最后析构): worker 池在 mux/store/tools 之后声明,
+   // 先于它们析构 join —— 不会 post 进已销毁对象.
+   //   llmPool: 跑同步 curl 的专用线程 (一次只有一个 completion 在飞);
+   //   toolPool: 跑 bash 子进程/文件扫描, 支持并行 tool calls.
+   pi::infra::EventLoop loop;
+   constexpr size_t     kLlmWorkers  = 1;
+   constexpr size_t     kToolWorkers = 4;
+
    pi::domain::Session           session{pi::infra::uuidv7(), cwd};
    pi::iface::adapter::LocalToolExecutor  tools{cwd};
    // pi 默认激活集: read/bash/edit/write; echo 留给 mock 测试通道.
@@ -138,9 +149,13 @@ int main(int argc, char** argv) {
    for (auto const& x : excludeTools)
       std::erase(active, x);
    if (!noTools) tools.setActiveTools(active);
+
+   pi::infra::ThreadPool llmPool{kLlmWorkers}, toolPool{kToolWorkers};
+   tools.setAsync(loop, toolPool);
+   pi::iface::adapter::AsyncLlmProvider asyncLlm{mux, loop, llmPool};
    pi::iface::AgentSessionService  service{
-      session, llm, tools, *store,
-      "You are cpp-pi, a DDD + DCI + trans-dsl rewrite of pi."};
+      session, asyncLlm, mux, tools, *store,
+      "You are cpp-pi, a DDD + DCI + trans-dsl rewrite of pi.", loop};
 
    // 目录 + provider 切换钩子 + 初始模型 (catalog 必含; mock 场景退 mock-1)
    service.setCatalog(std::move(bundle.catalog));
@@ -168,7 +183,8 @@ int main(int argc, char** argv) {
    }
 
    if (rpcMode) {
-      pi::iface::rpc::RpcFrontend frontend{service, session, store.get()};
+      pi::iface::rpc::RpcFrontend frontend{service, session, loop,
+                                           store.get()};
       return frontend.run();
    }
 
