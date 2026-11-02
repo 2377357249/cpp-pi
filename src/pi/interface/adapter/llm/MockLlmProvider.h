@@ -1,6 +1,7 @@
 #pragma once
 
 #include <charconv>
+#include <cstdlib>
 #include <string>
 
 #include <pi/domain/llm/ILlmProvider.h>
@@ -139,6 +140,31 @@ public:
          streamText(std::move(m), domain::StopReason::Stop, std::move(r));
          return;
       }
+      // 可注入的 provider 错误 (测 auto-retry): "fail:<times>:<msg>" —
+      // arm 后接下来 times 次 completion 全回 Error (retry 重发时上下文
+      // 末条已是 error assistant, 故按完成次数计、不按输入匹配).
+      if (input.rfind("fail:", 0) == 0) {
+         auto const rest = input.substr(5);
+         auto const sep  = rest.find(':');
+         failRemaining_  = sep == std::string::npos
+                              ? 1 : std::atoi(rest.substr(0, sep).c_str());
+         failMsg_        = sep == std::string::npos ? rest
+                                                  : rest.substr(sep + 1);
+      }
+      if (failRemaining_ > 0) {
+         --failRemaining_;
+         domain::Message err{domain::Role::Assistant, {}, {}, {}};
+         err.api = "mock"; err.provider = "mock"; err.model = modelId;
+         err.errorMessage = failMsg_;
+         domain::AssistantStreamEvent e{};
+         e.type = domain::AssistantStreamType::Error;
+         e.reason = domain::StopReason::Error;
+         e.delta  = failMsg_;
+         onEvent(e);
+         done(domain::CompletionResult{std::move(err),
+                                       domain::StopReason::Error});
+         return;
+      }
       // 前缀路由不同工具路径:
       //   "bash:<cmd>" / "unknown:<x>" / "tool:<name>:<json>" / 默认 echo
       std::string tool = "echo", arg = input;
@@ -201,6 +227,10 @@ public:
       done(domain::CompletionResult{std::move(msg),
                                     domain::StopReason::ToolUse});
    }
+
+private:
+   int         failRemaining_ = 0;   // "fail:<times>:<msg>" 剩余失败次数
+   std::string failMsg_;
 };
 
 } // namespace pi::iface::adapter

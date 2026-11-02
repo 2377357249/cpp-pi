@@ -10,6 +10,7 @@
 #include <pi/domain/event/Events.h>
 #include <pi/domain/llm/ILlmProvider.h>
 #include <pi/domain/tool/Tool.h>
+#include <pi/domain/turn/RetryPolicy.h>
 
 namespace pi::domain {
 
@@ -55,6 +56,8 @@ struct Completer {
 
    // EV_LLM_DONE 到达后: assistant 消息落聚合 (持久化增量由 Session 记账)
    // (不 move: TurnDone 谓词还要读 lastCompletion.toolCalls)
+   // retry 链解出: retryInFlight 下按本次结果发 auto_retry_end ——
+   // 仍是可重试错误则留链, 由 RetryPending 再起一轮 backoff.
    auto settle() -> void {
       auto& turn = ROLE(TurnStateCtx);
       auto& sink = *ROLE(EventSinkCtx).sink;
@@ -67,6 +70,15 @@ struct Completer {
       auto stored = ROLE(SessionCtx).session.appendAssistant(std::move(msg));
       sink.messageEnd(stored);
       turn.lastAssistant = std::move(stored);
+      if (turn.retryInFlight
+          && !domain::RetryPolicy::shouldRetry(turn)) {
+         auto const ok =
+            turn.lastCompletion.stopReason != domain::StopReason::Error;
+         sink.autoRetryEnd(ok, turn.retryAttempt,
+                           ok ? std::string_view{}
+                              : turn.lastCompletion.message.errorMessage);
+         turn.retryInFlight = false;
+      }
    }
 
 private:

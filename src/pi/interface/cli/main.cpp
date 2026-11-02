@@ -98,13 +98,16 @@ int main(int argc, char** argv) {
       agentDir, provider == "mock" ? std::nullopt : codex);
 
    pi::iface::adapter::LlmProviderMux mux;
+   std::vector<pi::iface::adapter::OpenAiProvider*> oaProviders;
    for (auto const& [pid, spec] : bundle.providers) {
       if (provider == "mock" && pid != "mock") continue;   // 离线密封
       if (pid == "mock") {
          mux.add(pid, std::make_unique<pi::iface::adapter::MockLlmProvider>());
       } else if (spec.api == "openai-responses" && !spec.apiKey.empty()) {
-         mux.add(pid, std::make_unique<pi::iface::adapter::OpenAiProvider>(
-                         spec.apiKey, spec.baseUrl, /*model*/ "", pid));
+         auto oa = std::make_unique<pi::iface::adapter::OpenAiProvider>(
+                      spec.apiKey, spec.baseUrl, /*model*/ "", pid);
+         oaProviders.push_back(oa.get());
+         mux.add(pid, std::move(oa));
       }
    }
    if (provider == "mock" || !mux.has("openai-codex")) {
@@ -154,8 +157,15 @@ int main(int argc, char** argv) {
    tools.setAsync(loop, toolPool);
    pi::iface::adapter::AsyncLlmProvider asyncLlm{mux, loop, llmPool};
    pi::iface::AgentSessionService  service{
-      session, asyncLlm, mux, tools, *store,
-      "You are cpp-pi, a DDD + DCI + trans-dsl rewrite of pi.", loop};
+      session, asyncLlm, tools, *store,
+      "You are cpp-pi, a DDD + DCI + trans-dsl rewrite of pi.",
+      loop, toolPool};
+
+   // abort 链路: service 自持旗标 -> 工具派发检查/bash spawn 杀进程树/
+   // provider 断 SSE 流, 三方共用同一个原子量.
+   tools.setAbortCheck([&service] { return service.aborted(); });
+   for (auto* oa : oaProviders)
+      oa->setAbortCheck([&service] { return service.aborted(); });
 
    // 目录 + provider 切换钩子 + 初始模型 (catalog 必含; mock 场景退 mock-1)
    service.setCatalog(std::move(bundle.catalog));
@@ -178,12 +188,13 @@ int main(int argc, char** argv) {
    });
 
    if (tuiMode) {
-      pi::iface::tui::TuiFrontend frontend{service, session, *store};
+      pi::iface::tui::TuiFrontend frontend{service, session, *store,
+                                           loop, toolPool};
       return frontend.run();
    }
 
    if (rpcMode) {
-      pi::iface::rpc::RpcFrontend frontend{service, session, loop,
+      pi::iface::rpc::RpcFrontend frontend{service, session, loop, toolPool,
                                            store.get()};
       return frontend.run();
    }

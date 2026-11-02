@@ -22,8 +22,10 @@ public:
                  domain::ILlmProvider&  llm,
                  domain::IToolExecutor& tools,
                  domain::ISessionStore& store,
-                 std::string            systemPrompt)
-      : AgentTurnService(llm, tools, store, session.id())
+                 std::string            systemPrompt,
+                 infra::ThreadPool&     ioPool,
+                 infra::EventLoop&      loop)
+      : AgentTurnService(llm, tools, store, session.id(), ioPool, loop)
       , AgentTurnContext(session, std::move(systemPrompt)) {}
 
    IMPL_ROLE(EventQueueCtx)
@@ -31,6 +33,7 @@ public:
    IMPL_ROLE(TurnStateCtx)
    IMPL_ROLE(SessionCtx)
    IMPL_ROLE(ModelCtx)
+   IMPL_ROLE(CompactCtx)
 };
 
 } // namespace pi::domain

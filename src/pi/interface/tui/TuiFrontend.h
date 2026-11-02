@@ -22,6 +22,8 @@
 #include <pi/domain/session/ISessionStore.h>
 #include <pi/domain/session/Session.h>
 #include <pi/domain/session/SessionFork.h>
+#include <pi/infra/async/EventLoop.h>
+#include <pi/infra/async/ThreadPool.h>
 #include <pi/infra/process/Shell.h>
 #include <pi/infra/util/Ids.h>
 #include <pi/infra/util/JsonSafe.h>
@@ -38,8 +40,10 @@ namespace pi::iface::tui {
 //         overlay + 底部输入框 + footer (模型/thinking/队列/token/ctx%).
 //   键位 (pi keybindings.ts): ctrl+p 循环模型, ctrl+l 模型选择器,
 //         shift+tab 循环 thinking, ctrl+t 思维块显隐, Esc 中止, ^C 退出.
-//   线程: UI 线程 ScreenInteractive; 提交进 pending_ 队列由单 worker 排干
-//         (prompt 与 slash 命令同一通道, 会话状态只在 worker 写).
+//   线程: UI 线程 = ScreenInteractive; 领域态全在 EventLoop 线程 —
+//         提交经 loop_.post 进 pending_ 队列, pumpPending 在 loop 线程
+//         排干 (prompt → service.startTurn 异步; Cmd → execCmd 同步段
+//         + compact/resume 的异步段). 领域态零锁, chat_ 视图态仍靠 mu.
 // ---------------------------------------------------------------------------
 class TuiFrontend {
 public:
@@ -48,18 +52,25 @@ public:
 
    TuiFrontend(AgentSessionService&   service,
                domain::Session&       session,
-               domain::ISessionStore& store)
+               domain::ISessionStore& store,
+               infra::EventLoop&      loop,
+               infra::ThreadPool&     pool)
       : service_(service), session_(session), store_(store),
+        loop_(loop), pool_(pool),
         screen_(ftxui::ScreenInteractive::Fullscreen()),
         sink_(chat_, [this] { screen_.PostEvent(ftxui::Event::Custom); }),
         compact_(service, session, &store,
                  [this](folly::dynamic f) { onCompactEvent(f); }) {}
 
    auto run() -> int {
-      service_.setAbortFlag(abortRequested_);
       service_.setEventSink(sink_);
       syncModel();
       syncSessionName();
+
+      // 领域线程: loop_.runUntil 是 owner-only —— 由专属 jthread 驱动,
+      // UI 线程一切提交/命令都经 post 落到这条线程.
+      loopThread_ = std::jthread(
+         [this] { loop_.runUntil([this] { return quit_.load(); }); });
 
       ftxui::InputOption iopt;
       iopt.multiline   = false;   // 默认 true: Enter 会先把 '\n' 插进 content
@@ -114,7 +125,7 @@ public:
             return true;
          }
          if (e == ftxui::Event::Escape) {            // 中止当前 turn
-            abortRequested_ = true;
+            service_.requestAbort();
             return true;
          }
          if (e == ftxui::Event::CtrlC) {             // 退出
@@ -148,8 +159,11 @@ public:
       });
 
       screen_.Loop(root);
-      abortRequested_ = true;
-      joinWorker();
+      // 退出: 中止在飞事务 + 停 loop 线程 (jthread 析构也会 join)
+      service_.requestAbort();
+      quit_ = true;
+      loop_.post([] {});
+      if (loopThread_.joinable()) loopThread_.join();
       return 0;
    }
 
@@ -159,10 +173,10 @@ private:
    enum class ItemKind { Prompt, Cmd };
    struct QueuedItem { ItemKind kind; std::string text; };
    enum class SelKind  { None, Model, Thinking, Session, Fork, Tree };
-   
+
    // ============================ 提交/队列 ============================
    // '/' 前缀 -> slashDispatch (UI 线程只做打开选择器/即时命令;
-   // 状态修改一律规范化成 Cmd 排进 pending_, worker 串行执行).
+   // 状态修改一律规范化成 Cmd 经 post 排进 pending_, loop 线程排干).
    auto submit(std::string text) -> void {
       if (!text.empty() && text.front() == '/' && slashDispatch(text))
          return;
@@ -170,43 +184,38 @@ private:
    }
 
    auto enqueue(std::string text, ItemKind k = ItemKind::Prompt) -> void {
-      {
-         std::lock_guard lk{queueMu_};
+      loop_.post([this, text = std::move(text), k] {
          pending_.push_back({k, std::move(text)});
          sink_.setQueued(pending_.size());
-         if (running_) return;
-         running_ = true;
-      }
-      joinWorker();
-      worker_ = std::thread([this] { workerLoop(); });
+         pumpPending();
+      });
    }
 
-   auto joinWorker() -> void {
-      if (worker_.joinable()) worker_.join();
+   // loop 线程排干: turn/compact/load 任一在飞即暂停; prompt ->
+   // startTurn 异步挂起, Cmd -> execCmd (可能起异步 compact/load).
+   auto pumpPending() -> void {
+      while (!pending_.empty() && !turnBusy_ && !ioBusy_
+             && !service_.compacting()) {
+         auto item = std::move(pending_.front());
+         pending_.pop_front();
+         sink_.setQueued(pending_.size());
+         if (item.kind == ItemKind::Cmd) {
+            execCmd(item.text);
+         } else {
+            turnBusy_ = true;
+            service_.startTurn(std::move(item.text),
+                               [this](auto) { onTurnDone(); });
+         }
+      }
+      sink_.setQueued(pending_.size());
+      syncModel();
+      screen_.PostEvent(ftxui::Event::Custom);
    }
 
-   // 排干语义同 RpcFrontend: 逐条执行; 中止旗标保留下一条.
-   auto workerLoop() -> void {
-      for (;;) {
-         QueuedItem item;
-         {
-            std::lock_guard lk{queueMu_};
-            if (pending_.empty() || abortRequested_) {
-               running_ = false;
-               sink_.setQueued(pending_.size());
-               return;
-            }
-            item = std::move(pending_.front());
-            pending_.pop_front();
-            sink_.setQueued(pending_.size());
-         }
-         if (item.kind == ItemKind::Cmd) execCmd(item.text);
-         else {
-            service_.runTurn(std::move(item.text));
-            compact_.maybeAutoCompact();
-         }
-         syncModel();
-      }
+   auto onTurnDone() -> void {
+      turnBusy_ = false;
+      // pi: 阈值压缩检查在队列排干之前; maybeAutoCompact 恒调 done.
+      compact_.maybeAutoCompact([this] { pumpPending(); });
    }
 
    // ============================ slash 命令 ============================
@@ -314,8 +323,9 @@ private:
          return;
       }
       if (name == "compact") {
-         std::string err;
-         compact_.run("manual", arg, false, &err);
+         // 协程化: CompactProc 事务跑摘要; 结束回 pumpPending.
+         compact_.run("manual", arg, false,
+                      [this](auto, auto) { pumpPending(); });
          return;
       }
       if (name == "name") {
@@ -340,14 +350,25 @@ private:
       }
       if (name == "resume") {
          if (arg.empty()) { info("resume: 需要会话文件路径"); return; }
-         std::optional<domain::Session> loaded;
-         store_.load(arg, [&](domain::Session s, std::string) {
-            loaded = std::move(s);
+         // 协程化: JSONL 全量读丢 pool; ioBusy_ 闸住后续队列.
+         ioBusy_ = true;
+         pool_.submit([this, arg] {
+            std::optional<domain::Session> loaded;
+            store_.load(arg, [&](domain::Session s, std::string) {
+               loaded = std::move(s);
+            });
+            loop_.post([this, arg, loaded = std::move(loaded)]() mutable {
+               ioBusy_ = false;
+               if (!loaded || loaded->entries().empty()) {
+                  info("resume: 非法会话文件 " + arg);
+               } else {
+                  session_ = std::move(*loaded);
+                  rebuild();
+                  info("resumed " + arg);
+               }
+               pumpPending();
+            });
          });
-         if (!loaded) { info("resume: 非法会话文件 " + arg); return; }
-         session_ = std::move(*loaded);
-         rebuild();
-         info("resumed " + arg);
          return;
       }
       if (name == "fork") {
@@ -775,6 +796,8 @@ private:
    AgentSessionService&      service_;
    domain::Session&          session_;
    domain::ISessionStore&    store_;
+   infra::EventLoop&         loop_;
+   infra::ThreadPool&        pool_;
 
    ChatModel                 chat_;
    ftxui::ScreenInteractive  screen_;
@@ -782,11 +805,12 @@ private:
    CompactRunner             compact_;
 
    std::string               input_;
+   // 以下全部只在 loop 线程被触碰 (quit_ 是 UI→loop 的跨线程旗标)
    std::deque<QueuedItem>    pending_;
-   std::mutex                queueMu_;
-   std::atomic<bool>         running_{false};
-   std::atomic<bool>         abortRequested_{false};
-   std::thread               worker_;
+   bool                      turnBusy_ = false;   // run 在飞
+   bool                      ioBusy_   = false;   // 异步 load 在飞
+   std::atomic<bool>         quit_{false};
+   std::jthread              loopThread_;
 
    // 选择器状态 (仅 UI 线程读写)
    SelKind                   sel_ = SelKind::None;

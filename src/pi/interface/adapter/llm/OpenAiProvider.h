@@ -41,6 +41,12 @@ public:
       , model_(std::move(model))
       , provider_(std::move(providerName)) {}
 
+   // 外部中止钩子: SSE feed 每块检查一次, 命中即断流 (curl WRITE_ERROR
+   // 收尾成 Error 结果; Completer::settle 按中止旗标改记 Aborted).
+   auto setAbortCheck(std::function<bool()> f) -> void {
+      abortCheck_ = std::move(f);
+   }
+
    void complete(domain::CompletionRequest req,
                  domain::AssistantStreamHandler onEvent,
                  domain::CompletionHandler done) override {
@@ -49,6 +55,7 @@ public:
       auto body = buildBody(req, modelId);
 
       SseState st{onEvent, modelId, provider_};
+      st.aborted = abortCheck_ ? &abortCheck_ : nullptr;
       auto resp = infra::httpPostJsonStream(
          baseUrl_ + "/responses", folly::toJson(body),
          {"Authorization: Bearer " + apiKey_,
@@ -97,6 +104,7 @@ private:
    struct SseState {
       domain::AssistantStreamHandler       onEvent;
       std::string                          modelId, provider;
+      std::function<bool()>*               aborted = nullptr;
       std::string                          buf;          // 行缓冲
       std::unordered_map<int, Slot>        slots;        // output_index -> slot
       int                                  nextIndex = 0;
@@ -127,7 +135,9 @@ private:
       }
 
       // 喂字节块: 按行切, "data: {...}" 逐条进 handle.
+      // aborted 钩子命中 -> 断流 (feed false -> curl 中止).
       auto feed(std::string_view chunk) -> bool {
+         if (aborted && (*aborted)()) return false;
          buf += chunk;
          for (size_t nl; (nl = buf.find('\n')) != std::string::npos;) {
             std::string line = buf.substr(0, nl);
@@ -572,6 +582,7 @@ private:
    }
 
    std::string apiKey_, baseUrl_, model_, provider_;
+   std::function<bool()> abortCheck_;
 };
 
 } // namespace pi::iface::adapter

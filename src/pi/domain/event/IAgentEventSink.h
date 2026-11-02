@@ -39,6 +39,19 @@ struct IAgentEventSink {
                         std::vector<Message> const& toolResults) -> void = 0;
    virtual auto agentEnd(std::vector<Message> const& messages,
                          bool willRetry) -> void = 0;
+
+   // pi auto_retry 事件 (非纯虚 —— 不关心的 sink 可留默认空实现):
+   // auto_retry_start{attempt,maxAttempts,delayMs,errorMessage}
+   // auto_retry_end{success,attempt,finalError?}
+   virtual auto autoRetryStart(size_t attempt, size_t maxAttempts,
+                               int64_t delayMs,
+                               std::string_view errorMessage) -> void {
+      (void)attempt; (void)maxAttempts; (void)delayMs; (void)errorMessage;
+   }
+   virtual auto autoRetryEnd(bool success, size_t attempt,
+                             std::string_view finalError) -> void {
+      (void)success; (void)attempt; (void)finalError;
+   }
 };
 
 // 无 sink 环境 (CLI/测试) 的默认实现: 全部 no-op.

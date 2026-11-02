@@ -12,6 +12,7 @@
 #include <pi/domain/compaction/CompactionPolicy.h>
 #include <pi/domain/session/ISessionStore.h>
 #include <pi/domain/session/Session.h>
+#include <pi/infra/util/JsonSafe.h>
 #include <pi/interface/rpc/JsonCodec.h>
 #include <pi/interface/trans/AgentSessionService.h>
 
@@ -20,12 +21,17 @@ namespace pi::iface {
 // ---------------------------------------------------------------------------
 // 压缩执行器 (pi agent-session.compact + compaction.ts), 两前端共用.
 // reason ∈ {manual, threshold, overflow}; willRetry 仅 overflow 可为 true.
-// emit 回调收到 compaction_start/compaction_end 帧 —— RPC 直接上线,
-// TUI 翻成提示块. errOut 带回命令响应用的裸错误串; 事件 errorMessage 带
-// pi 前缀 (manual: "Compaction failed:" 等).
+//   同步段: compaction_start 帧 + prepare 检查 (loop 线程);
+//   异步段: 摘要/落盘走 service.startCompact 的 CompactProc 事务 ——
+//   期间 loop 保持响应 (prompt 报 compaction-in-progress 错误, abort 可取消).
+// done(result|null, err) 恒被调一次 —— 同步失败立即回, 异步收尾经事务回调.
+// emit 收到 compaction_start/compaction_end 帧 —— RPC 直接上线, TUI 翻提示块.
 // ---------------------------------------------------------------------------
 class CompactRunner {
 public:
+   using Done =
+      std::function<void(std::optional<folly::dynamic>, std::string err)>;
+
    CompactRunner(AgentSessionService&       service,
                  domain::Session&           session,
                  domain::ISessionStore*     store,
@@ -38,14 +44,11 @@ public:
 
    auto run(std::string_view reason,
             std::string_view instructions, bool willRetry,
-            std::string* errOut)
-      -> std::optional<folly::dynamic> {
+            Done done) -> void {
       emit_(folly::dynamic::object("type", "compaction_start")
                                   ("reason", std::string{reason}));
 
-      auto fail = [&](std::string_view msg)
-         -> std::optional<folly::dynamic> {
-         if (errOut) *errOut = std::string{msg};
+      auto fail = [&](std::string_view msg) {
          std::string_view prefix =
             reason == "manual"    ? "Compaction failed: "
             : reason == "overflow" ? "Context overflow recovery failed: "
@@ -54,7 +57,7 @@ public:
                   ("reason", std::string{reason})
                   ("aborted", false)("willRetry", false)
                   ("errorMessage", std::format("{}{}", prefix, msg)));
-         return std::nullopt;
+         if (done) done(std::nullopt, std::string{msg});
       };
 
       auto const path = session_.branchEntries();
@@ -65,116 +68,45 @@ public:
       auto prep = domain::prepareCompaction(session_);
       if (!prep) return fail("Nothing to compact (session too small)");
 
-      // LLM 摘要请求 (pi buildSummarizationContext: system + 单条 user)
-      std::string summarizeErr;
-      auto summarize = [&](std::string promptText,
-                           std::string_view label)
-         -> std::optional<domain::CompletionResult> {
-         domain::Message u{domain::Role::User, std::move(promptText), {}, {}};
-         auto r = service_.completeOnce(domain::CompletionRequest{
-            std::vector<domain::Message>{std::move(u)},
-            {},
-            std::string{domain::kSummarizationSystemPrompt}});
-         if (auto f = domain::summarizationFailure(r, label)) {
-            summarizeErr = *f;
-            return std::nullopt;
-         }
-         return r;
-      };
-
-      std::string   summary;
-      domain::Usage usage;
-      if (prep->isSplitTurn && !prep->turnPrefixMessages.empty()) {
-         std::string history = prep->previousSummary.empty()
-                                  ? "No prior history." : "";
-         bool haveHist = false;
-         if (!prep->messagesToSummarize.empty()) {
-            auto r = summarize(domain::buildSummarizationPrompt(
-                                  prep->messagesToSummarize,
-                                  prep->previousSummary, instructions),
-                               "Summarization");
-            if (!r) return fail(summarizeErr);
-            history  = r->message.text;
-            usage    = r->message.usage;
-            haveHist = true;
-         }
-         auto pr = summarize(domain::buildTurnPrefixPrompt(
-                                prep->turnPrefixMessages, instructions),
-                             "Turn prefix summarization");
-         if (!pr) return fail(summarizeErr);
-         summary = std::format("{}\n\n---\n\n**Turn Context (split turn):**\n\n{}",
-                               history, pr->message.text);
-         if (haveHist) {
-            usage.input += pr->message.usage.input;
-            usage.output += pr->message.usage.output;
-            usage.cacheRead += pr->message.usage.cacheRead;
-            usage.cacheWrite += pr->message.usage.cacheWrite;
-            usage.totalTokens += pr->message.usage.totalTokens;
-         } else usage = pr->message.usage;
-      } else {
-         auto r = summarize(domain::buildSummarizationPrompt(
-                               prep->messagesToSummarize,
-                               prep->previousSummary, instructions),
-                            "Summarization");
-         if (!r) return fail(summarizeErr);
-         summary = r->message.text;
-         usage   = r->message.usage;
-      }
-
-      // pi: summary += formatFileOperations; details={readFiles,modifiedFiles}
-      summary += domain::formatFileOperations(prep->filesRead,
-                                              prep->filesModified);
-      folly::dynamic readOnly = folly::dynamic::array();
-      for (auto const& f : prep->filesRead)
-         if (!prep->filesModified.contains(f)) readOnly.push_back(f);
-      folly::dynamic modified = folly::dynamic::array();
-      for (auto const& f : prep->filesModified) modified.push_back(f);
-      folly::dynamic details =
-         folly::dynamic::object("readFiles", std::move(readOnly))
-                               ("modifiedFiles", std::move(modified));
-
-      domain::CompactionEntry ce;
-      ce.summary          = summary;
-      ce.firstKeptEntryId = prep->firstKeptEntryId;
-      ce.tokensBefore     = prep->tokensBefore;
-      ce.detailsJson      = folly::toJson(details);
-      ce.usage            = usage;
-      ce.hasUsage         = true;
-      auto const& saved = session_.appendEntry(
-         domain::Entry{domain::EntryBase{}, std::move(ce)});
-      if (store_)
-         store_->append(session_, session_.unpersisted(),
-                        [](bool) {});
-      session_.markPersisted();
-
-      auto const estimatedAfter =
-         domain::estimateContextTokens(session_.messages());
-      folly::dynamic result = folly::dynamic::object
-         ("summary", summary)
-         ("firstKeptEntryId", prep->firstKeptEntryId)
-         ("tokensBefore", prep->tokensBefore)
-         ("estimatedTokensAfter", estimatedAfter)
-         ("usage", rpc::usageToJson(usage))
-         ("details", std::move(details));
-      emit_(folly::dynamic::object("type", "compaction_end")
-               ("reason", std::string{reason})("result", result)
-               ("aborted", false)("willRetry", willRetry));
-      (void)saved;
-      return result;
+      service_.startCompact(
+         std::move(*prep), std::string{reason},
+         std::string{instructions}, willRetry,
+         [this, reason = std::string{reason}, willRetry,
+          done = std::move(done)](TSL_NS::Status) mutable {
+            domain::CompactCtx const& cx = service_.impl();
+            if (!cx.error.empty()) {
+               std::string_view prefix =
+                  reason == "manual"    ? "Compaction failed: "
+                  : reason == "overflow" ? "Context overflow recovery failed: "
+                                        : "Auto-compaction failed: ";
+               emit_(folly::dynamic::object("type", "compaction_end")
+                     ("reason", reason)("aborted", cx.aborted)
+                     ("willRetry", willRetry)
+                     ("errorMessage",
+                      std::format("{}{}", prefix, cx.error)));
+               if (done) done(std::nullopt, cx.error);
+               return;
+            }
+            finishSuccess(cx, reason, willRetry, done);
+         });
    }
 
    // pi _checkCompaction 自动 case 3: 阈值压缩 (无重试).
    // usage 有效 → calculateContextTokens; error/零 usage → 全量估算.
    // 早于最新压缩边界的 assistant 不重复触发.
-   auto maybeAutoCompact() -> void {
-      if (!autoEnabled_ || service_.model().contextWindow <= 0) return;
+   // done 恒被调一次 (未启动也立即调) —— 前端靠它推进队列/泵.
+   auto maybeAutoCompact(std::function<void()> done) -> void {
+      auto no = [&] { if (done) done(); };
+      if (!autoEnabled_ || service_.model().contextWindow <= 0
+          || service_.compacting())
+         return no();
       auto const msgs = session_.messages();
       domain::Message const* lastA = nullptr;
       for (auto const& m : msgs | std::views::reverse) {
          if (m.role == domain::Role::Assistant) { lastA = &m; break; }
       }
       if (lastA == nullptr
-          || lastA->stopReason == domain::StopReason::Aborted) return;
+          || lastA->stopReason == domain::StopReason::Aborted) return no();
 
       for (auto const& e : session_.branchEntries() | std::views::reverse) {
          if (!std::holds_alternative<domain::CompactionEntry>(e.payload))
@@ -182,7 +114,7 @@ public:
          if (lastA->timestampMs != 0
              && lastA->timestampMs
                    <= domain::isoToMs(e.timestampIso))
-            return;
+            return no();
          break;
       }
 
@@ -195,13 +127,33 @@ public:
             : direct;
       if (contextTokens
           <= service_.model().contextWindow - domain::kReserveTokens)
-         return;
+         return no();
       // pi _runAutoCompaction: prepare 先行, 失败静默 (不发 compaction_*)
-      if (!domain::prepareCompaction(session_)) return;
-      run("threshold", "", false, nullptr);
+      if (!domain::prepareCompaction(session_)) return no();
+      run("threshold", "", false,
+          [done = std::move(done)](auto, auto) { if (done) done(); });
    }
 
 private:
+   auto finishSuccess(domain::CompactCtx const& cx,
+                      std::string const& reason, bool willRetry,
+                      Done const& done) -> void {
+      auto details = infra::parseJsonSafe(cx.detailsJson);
+      auto const estimatedAfter =
+         domain::estimateContextTokens(session_.messages());
+      folly::dynamic result = folly::dynamic::object
+         ("summary", cx.summary)
+         ("firstKeptEntryId", cx.prep->firstKeptEntryId)
+         ("tokensBefore", cx.prep->tokensBefore)
+         ("estimatedTokensAfter", estimatedAfter)
+         ("usage", rpc::usageToJson(cx.usage));
+      if (details) result["details"] = *details;
+      emit_(folly::dynamic::object("type", "compaction_end")
+               ("reason", reason)("result", result)
+               ("aborted", cx.aborted)("willRetry", willRetry));
+      if (done) done(std::move(result), {});
+   }
+
    AgentSessionService&                 service_;
    domain::Session&                     session_;
    domain::ISessionStore*               store_;

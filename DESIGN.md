@@ -35,7 +35,7 @@
 
 ## 3. 两种"事件"，各归各位
 
-- **协议事件**（domain/event/Events.h）：事务对外的响应契约。`EV_LLM_DONE` `EV_TOOLS_DONE` `EV_STORE_DONE` `EV_LOAD_DONE` `EV_USER_INPUT` `EV_ABORT`。
+- **协议事件**（domain/event/Events.h）：事务对外的响应契约。`EV_LLM_DONE` `EV_TOOLS_DONE` `EV_STORE_DONE` `EV_LOAD_DONE` `EV_USER_INPUT` `EV_ABORT` `EV_RETRY_DUE`。
 - **传输事件**（infra 内部）：SSE chunk、fd 就绪、stdin 行。infra 内部消化后经回调翻译为协议事件。
 - 领域事件（`TurnCompleted` 等，给审计/遥测）以后再加，归 domain。
 
@@ -45,15 +45,25 @@
   `runUntil(done)` 只能由 owner 线程调用——所有 role/context/sink/Session 访问都在
   loop 线程，**领域态零锁**。
 - **`infra::ThreadPool`**：收容同步阻塞原语（`curl_easy_perform`/`spawnMerged`/文件
-  扫描）。适配器把回调 marshal 回 loop：`AsyncLlmProvider`（llmPool×1）与
-  `LocalToolExecutor::setAsync`（toolPool×N，真并行 tool calls）。
+  扫描/backoff 睡眠/会话加载）。适配器把回调 marshal 回 loop：`AsyncLlmProvider`
+  （llmPool×1）、`LocalToolExecutor::setAsync`（toolPool×N，真并行 tool calls）、
+  `Retryer` 的 `EV_RETRY_DUE` 定时器、RPC `bash`/load 的 pool 任务→`loop.post`。
 - **泵送**：`EventQueueCtx::onPost` → `loop.post(pump)`，延迟投递绝不重入
-  `handleEvent`；`AgentSessionService::startTurn` 返回即挂起，`runTurn` 保留同步
-  包装（CLI/TUI worker）。
-- **前端**：`RpcFrontend` 无 turn 线程——stdin reader jthread 投递行，`inbox_`
-  按序把守（busy 时 steer/follow_up/prompt 插队，其余堵头部=旧 turnMu_ 串行化），
-  `busy_` 覆盖 run+排干链。shutdown 顺序：loop 最先声明（最后析构），池先于其
-  引用的对象析构 join。
+  `handleEvent`；`post()` 只在 loop 线程被调（worker 一律先 marshal）。
+  `AgentSessionService::startTurn/startCompact` 返回即挂起，`runTurn` 保留同步
+  包装（CLI）。
+- **两条事务类型**：`AgentTurn`（run）与 `CompactProc`（压缩）共享同一 impl
+  context 树，任一时刻只有一条活跃，`pump` 把队列事件喂给活跃事务。
+- **前端**：`RpcFrontend`/`TuiFrontend` 都无 turn 线程——RPC stdin reader jthread
+  投递行；TUI 专属 `loopThread_` 驱动 `runUntil`，UI 线程提交经 `loop.post` 进
+  `pending_` 队列由 `pumpPending` 排干。RPC `inbox_` 头部把守保序（blocked 时
+  abort 系/preempt 置旗堵头部，其余照常分发=pi 单线程语义）；`busy_` 覆盖
+  run+排干链+auto-compact 窗口。
+- **abort 链路**：`service.abortRequested_` 原子旗标是唯一真值——事务谓词
+  （TurnDone）、`ToolRunner` 派发、`BuiltinTools::aborted`（bash spawn 杀进程树）、
+  `OpenAiProvider::setAbortCheck`（断 SSE 流）、`Retryer` backoff（50ms 分片醒）
+  共用。preempt 命令（compact/new_session/switch/fork/clone）置旗后被新事务起点
+  复位；`abort_retry` 只杀 backoff sleep 不动 run。
 
 ## 3.5 领域规则回 domain（不漂在 role/action 里）
 
@@ -87,16 +97,26 @@ SessionLoop = __transaction
            , __optional(ContextOverflow, __procedure(Compact)))
 );
 
-// 轮次级: pi agent loop 的事务化表达
-AgentTurn = __procedure
-( __loop_max(64,
-      __with_id(1, __asyn(RequestCompletion))        // WAIT_ON(EV_LLM_DONE)
-    , __with_id(2, __asyn(ExecuteTools))             // WAIT_ON(EV_TOOLS_DONE)
-    , __with_id(5, __asyn(PersistDelta))             // WAIT_ON(EV_STORE_DONE)
-    , __until(TurnDone))                              // 无 toolCalls → 本轮结束
-, __time_guard(TURN_TIMER, TURN_TIMEOUT_MS)
-, __finally(__sync(FlushTurnStats))
-);
+// 轮次级: pi agent loop 的事务化表达 (已实现)
+AgentTurn = Loop<64,
+   __with_id(1, __asyn(RequestCompletion))           // WAIT_ON(EV_LLM_DONE)
+ , __with_id(2, __asyn(ExecuteTools))                // WAIT_ON(EV_TOOLS_DONE)
+ , __with_id(3, __asyn(FinishTurn))
+ , __with_id(5, __asyn(PersistDelta))                // WAIT_ON(EV_STORE_DONE)
+ , __optional(RetryPending,
+      __with_id(6, __asyn(RetryBackoff)))            // WAIT_ON(EV_RETRY_DUE)
+ , __until(TurnDone)>;    // finished && !retryInFlight
+
+// 压缩级 (已实现): 两段摘要 → 组 entry → 落盘
+CompactProc = __transaction
+( __optional(NeedsHistorySummary, __asyn(Summarize)) // WAIT_ON(EV_LLM_DONE)
+, __optional(NeedsPrefixSummary,  __asyn(Summarize))
+, __asyn(AssembleCompaction), __asyn(PersistDelta) );
+
+// auto-retry: RetryPolicy (domain) 判可重试 (RETRYABLE 模式非 overflow),
+// Retryer::begin 发 auto_retry_start + ioPool 分片睡到 EV_RETRY_DUE;
+// abort_retry → Retryer::cancel 只杀 sleep. 重试 completion 解出后
+// Completer::settle 发 auto_retry_end.
 
 // 工具调用级(每 call 一个 proc, pi 最有特色处)
 ToolCalls = __procedure( PermissionGate → ExecTool → Report );

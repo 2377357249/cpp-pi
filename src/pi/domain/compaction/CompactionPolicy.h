@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include <pi/domain/llm/Completion.h>
 #include <pi/domain/session/EntryProjection.h>
 #include <pi/domain/session/Session.h>
 

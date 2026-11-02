@@ -23,6 +23,7 @@
 #include <pi/domain/session/Session.h>
 #include <pi/domain/session/SessionFork.h>
 #include <pi/infra/async/EventLoop.h>
+#include <pi/infra/async/ThreadPool.h>
 #include <pi/infra/process/Shell.h>
 #include <pi/infra/util/Ids.h>
 #include <pi/infra/util/JsonSafe.h>
@@ -44,15 +45,18 @@ class RpcFrontend {
 public:
    static constexpr std::array kThinkingLevels{
       "off", "minimal", "low", "medium", "high", "xhigh", "max"};
+   // RPC bash 命令输出上限 (原 infra::runShell 的 8KB 截断语义)
+   static constexpr size_t kBashMaxBytes = 8192;
 
    RpcFrontend(AgentSessionService&   service,
                domain::Session&       session,
                infra::EventLoop&      loop,
+               infra::ThreadPool&     ioPool,
                domain::ISessionStore* store = nullptr,
                std::istream&          in  = std::cin,
                std::ostream&          out = std::cout)
       : service_(service), session_(session), store_(store),
-        loop_(loop), in_(in), out_(out),
+        loop_(loop), pool_(ioPool), in_(in), out_(out),
         sink_([this](folly::dynamic f) { emit(std::move(f)); }),
         compact_(service, session, store,
                  [this](folly::dynamic f) { emit(std::move(f)); }) {}
@@ -65,7 +69,6 @@ public:
    auto sessionFile() const -> std::string { return sessionFilePath(); }
 
    int run() {
-      service_.setAbortFlag(abortRequested_);
       service_.setEventSink(sink_);
       // stdin 是唯一自带线程的事件源 (阻塞 getline); 行+EOF 都经
       // loop.post 回 owner 线程 —— 命令处理/事务/发射全在 loop 线程.
@@ -78,7 +81,9 @@ public:
          loop_.post([this] { eof_ = true; });
       });
       loop_.runUntil([this] {
-         return eof_ && inbox_.empty() && !busy_;
+         return eof_ && inbox_.empty() && !busy_
+                && !service_.compacting() && !loading_
+                && bashInFlight_ == 0;
       });
       return 0;
    }
@@ -86,16 +91,23 @@ public:
 private:
    // ---------- 并发模型 (pi: prompt 返回 started 后 turn 后台跑) ----------
    // 单线程事件循环: stdin reader 线程只负责投递行; 命令按行序在
-   // pumpCommands 里处理 —— busy_ 时快路径命令 (steer/follow_up/prompt
-   // 排队语义) 就地消费, 其余堵在 inbox 头部等 turn 收尾 (等价旧
-   // turnMu_ 串行化 + 严格保序). abortRequested_ 仍是原子旗标:
-   // 写方包括未来的跨线程源.
-   std::atomic<bool>       abortRequested_{false};
+   // pumpCommands 里处理 —— blocked (run/compact/load 进行中) 时
+   // abort 系/preempt 命令置旗堵在头部 (响应延后, pi await run 同义),
+   // 其余命令照常分发 (pi 单线程事件语义 ↔ 本 loop 线程串行).
+   //   busy_:    turn 链进行中 (run + 队列排干 + auto-compact 窗口)
+   //   loading_: switch_session 的异步 load 在飞 —— 全命令等
+   //   bashInFlight_/bashAbort_: RPC bash 命令走 ioPool, 可跨 run 并发;
+   //             streaming 期间的 BashExecution 记录延迟到 run 末 (pi).
    std::deque<std::string> inbox_;
-   bool                    eof_     = false;
-   bool                    busy_    = false;   // run 或其队列排干链进行中
-   bool                    pumping_ = false;
+   bool                    eof_          = false;
+   bool                    busy_         = false;
+   bool                    loading_      = false;
+   bool                    pumping_      = false;
+   size_t                  bashInFlight_ = 0;
+   std::atomic<bool>       bashAbort_{false};
+   std::deque<domain::Entry> stashedBash_;
    infra::EventLoop&       loop_;
+   infra::ThreadPool&      pool_;
 
    // pi: 这些命令先中止进行中的 run (compact 也 await this.abort()).
    static auto isPreempt(std::string_view type) -> bool {
@@ -104,8 +116,7 @@ private:
              || type == "clone";
    }
 
-   // 按行序处理 inbox 头部. busy_ 时非快路径命令在头部阻塞 ——
-   // 后续命令仍在它们之后排队 (pi 单事件循环同义).
+   // 按行序处理 inbox 头部. blocked 时非快路径命令在头部阻塞.
    auto pumpCommands() -> void {
       if (pumping_) return;
       pumping_ = true;
@@ -123,30 +134,43 @@ private:
             inbox_.pop_front();
             continue;
          }
-         auto const type = strField(*parsed, "type");
+         auto const type    = strField(*parsed, "type");
+         auto const blocked = busy_ || service_.compacting() || loading_;
 
-         if (busy_) {
-            // 快路径: 能插进运行中 run 的命令就地分发
-            if (type == "steer" || type == "follow_up"
-                || type == "prompt") {
-               auto resp = handle(*parsed);
-               if (!resp.isNull()) emit(resp);
+         if (blocked) {
+            // 立即生效类 (不动 run 本身, 直接应答):
+            //   abort_retry 杀 backoff sleep; abort_bash 杀在飞 bash
+            //   (旗标只在有在飞时有效 —— 否则残留会误杀下一条 bash)
+            if (type == "abort_retry") {
+               service_.cancelRetry();
+               emit(ok_(idOf(*parsed), "abort_retry"));
                inbox_.pop_front();
                continue;
             }
-            // abort/抢占类置旗, 响应延后到 run 收尾 (pi await run 同义)
-            if (type == "abort" || isPreempt(type))
-               abortRequested_ = true;
-            break;
-         }
-
-         if (type == "abort") {
-            abortRequested_ = true;
-            emit(ok_(idOf(*parsed), "abort"));
+            if (type == "abort_bash") {
+               bashAbort_ = bashInFlight_ > 0;
+               emit(ok_(idOf(*parsed), "abort_bash"));
+               inbox_.pop_front();
+               continue;
+            }
+            // abort/抢占类置旗, 响应延后到 run/compact 收尾
+            // (pi await run 同义)
+            if (type == "abort") { service_.requestAbort(); break; }
+            if (isPreempt(type)) { service_.requestAbort(); break; }
+            if (loading_) break;    // 会话手术中: 其余命令排队等加载
+            // busy_/compacting_ 期间其余命令照常分发 —— 所有状态
+            // 都在 loop 线程, 天然串行 (pi 单线程事件循环同义)
+            auto resp = handle(*parsed);
+            if (!resp.isNull()) emit(resp);
             inbox_.pop_front();
             continue;
          }
-         if (isPreempt(type)) abortRequested_ = true;
+
+         // 空闲: abort 系立即置旗 + 应答
+         if (type == "abort")       service_.requestAbort();
+         if (type == "abort_bash")  bashAbort_ = bashInFlight_ > 0;
+         if (type == "abort_retry") service_.cancelRetry();
+         if (isPreempt(type))       service_.requestAbort();
          auto resp = handle(*parsed);
          if (!resp.isNull()) emit(resp);   // prompt 的响应在 handle 内已发
          inbox_.pop_front();
@@ -155,17 +179,30 @@ private:
    }
 
    auto startTurn(std::string msg) -> void {
-      abortRequested_ = false;
-      busy_           = true;
+      busy_ = true;
       service_.startTurn(std::move(msg), [this](auto) { onRunDone(); });
    }
 
+   // streaming 中完成的 RPC bash 记录延迟到 run 末 (pi recordBashResult)
+   auto drainBashStash() -> void {
+      while (!stashedBash_.empty()) {
+         session_.appendEntry(std::move(stashedBash_.front()));
+         stashedBash_.pop_front();
+      }
+   }
+
    // 一轮 run 收尾 (service 的 RunDoneHandler, loop 线程):
-   // pi: 阈值压缩检查 → steering 先于 followUp 排干 (abort 旗标下
-   // 保留剩余队列) → 空闲后放行 inbox 阻塞命令.
+   // pi: bash 延迟记录落库 → 阈值压缩检查 (可能起 CompactProc) →
+   // steering 先于 followUp 排干 (abort 旗标下保留剩余队列) →
+   // 空闲后放行 inbox 阻塞命令.
    auto onRunDone() -> void {
-      compact_.maybeAutoCompact();
-      if (!abortRequested_ && (!steering_.empty() || !followUp_.empty())) {
+      drainBashStash();
+      compact_.maybeAutoCompact([this] { afterCompact(); });
+   }
+
+   auto afterCompact() -> void {
+      drainBashStash();
+      if (!service_.aborted() && (!steering_.empty() || !followUp_.empty())) {
          std::string msg;
          if (!steering_.empty()) {
             msg = std::move(steering_.front());
@@ -262,6 +299,11 @@ private:
 
       if (type == "prompt") {
          auto msg = strField(cmd, "message");
+         // pi: 压缩进行中 prompt -> 固定错误串 (compacting error)
+         if (service_.compacting())
+            return error_(id, "prompt",
+               "Cannot submit a prompt while compaction is in progress. "
+               "Wait for compaction to finish and retry.");
          // pi: 运行中 prompt 排队 (followUp 通道), disposition "queued"
          if (busy_) {
             followUp_.push_back(std::move(msg));
@@ -373,7 +415,7 @@ private:
          return ok_(id, "set_auto_compaction");
       }
       if (type == "set_auto_retry") {
-         autoRetryEnabled_ = boolField(cmd, "enabled", true);
+         service_.setAutoRetry(boolField(cmd, "enabled", true));
          return ok_(id, "set_auto_retry");
       }
       if (type == "set_session_name") {
@@ -398,7 +440,7 @@ private:
                     folly::dynamic::object("cancelled", false));
       }
       if (type == "abort" || type == "abort_bash" || type == "abort_retry") {
-         return ok_(id, type);   // EV_ABORT 链路待接
+         return ok_(id, type);   // 置旗/取消在 pumpCommands 已完成
       }
       if (type == "clear_queue") {
          auto steering = folly::dynamic::array();
@@ -413,28 +455,58 @@ private:
                                           ("followUp", std::move(followUp)));
       }
       if (type == "bash") {
-         auto r = infra::runShell(strField(cmd, "command"));
-         // recordBashResult: bashExecution 消息入会话 (不发 message_*)
-         domain::Message bm{domain::Role::BashExecution, {}, {}, {}};
-         bm.command          = strField(cmd, "command");
-         bm.text             = r.output;
-         bm.exitCode         = r.exitCode;
-         bm.truncated        = r.truncated;
-         bm.excludeFromContext = boolField(cmd, "excludeFromContext", false);
-         bm.timestampMs      = infra::nowMs();
-         session_.appendEntry(domain::Entry{domain::EntryBase{}, domain::MessageEntry{std::move(bm)}});
-         return ok_(id, "bash",
-                    folly::dynamic::object("output", r.output)
-                       ("exitCode", r.exitCode)("cancelled", false)
-                       ("truncated", r.truncated));
+         // 协程化: spawn 体丢 ioPool, 响应/落库在 done 回调回 loop 线程.
+         // streaming (busy_) 中的记录延迟到 run 末 (pi recordBashResult).
+         auto const command = strField(cmd, "command");
+         auto const excl    = boolField(cmd, "excludeFromContext", false);
+         ++bashInFlight_;
+         pool_.submit([this, command, excl, id] {
+            std::string out;
+            bool        truncated = false;
+            auto const  r = infra::spawnShell(command, "/bin/bash",
+               {.onData = [&](std::string_view c) {
+                   out += c;
+                   if (out.size() > kBashMaxBytes) {
+                      out.resize(kBashMaxBytes);
+                      truncated = true;
+                   }
+                },
+                .aborted = [this] { return bashAbort_.load(); }});
+            loop_.post([this, command, excl, id, r,
+                        out = std::move(out), truncated] {
+               --bashInFlight_;
+               if (bashInFlight_ == 0) bashAbort_ = false;
+               domain::Message bm{domain::Role::BashExecution, {}, {}, {}};
+               bm.command            = command;
+               bm.text               = out;
+               bm.exitCode           = r.exitCode;
+               bm.cancelled          = r.aborted;
+               bm.truncated          = truncated;
+               bm.excludeFromContext = excl;
+               bm.timestampMs        = infra::nowMs();
+               domain::Entry e{domain::EntryBase{},
+                               domain::MessageEntry{std::move(bm)}};
+               if (busy_) stashedBash_.push_back(std::move(e));
+               else       session_.appendEntry(std::move(e));
+               emit(ok_(id, "bash",
+                        folly::dynamic::object("output", out)
+                           ("exitCode", r.exitCode)
+                           ("cancelled", r.aborted)
+                           ("truncated", truncated)));
+               pumpCommands();
+            });
+         });
+         return folly::dynamic{};
       }
       if (type == "compact") {
-         std::string compactErr;
-         auto r = compact_.run("manual",
-                               strField(cmd, "customInstructions"),
-                               false, &compactErr);
-         return r ? ok_(id, "compact", std::move(*r))
-                  : error_(id, "compact", compactErr);
+         // 协程化: 摘要/落盘走 CompactProc 事务; 响应在 done 回调里发.
+         compact_.run("manual", strField(cmd, "customInstructions"), false,
+            [this, id](std::optional<folly::dynamic> res, std::string err) {
+               emit(res ? ok_(id, "compact", std::move(*res))
+                        : error_(id, "compact", err));
+               pumpCommands();
+            });
+         return folly::dynamic{};
       }
       if (type == "export_html") {
          auto path = strField(cmd, "outputPath");
@@ -486,25 +558,36 @@ private:
       return ok_(id, at ? "clone" : "fork", std::move(data));
    }
 
+   // 协程化: JSONL 全量读丢 ioPool (loading_ 闸住 inbox), 应用/应答回 loop.
    auto switchSession(folly::dynamic const& id, std::string const& path)
       -> folly::dynamic {
       if (path.empty() || !store_)
          return error_(id, "switch_session",
                        std::format("Session file not found: {}", path));
-
-      std::optional<domain::Session> loaded;
-      std::string                    loadedPath;
-      store_->load(path, [&](domain::Session s, std::string fp) {
-         loaded     = std::move(s);
-         loadedPath = std::move(fp);
+      loading_ = true;
+      auto* store = store_;
+      pool_.submit([this, store, path, id] {
+         std::optional<domain::Session> loaded;
+         std::string                    fp;
+         store->load(path, [&](domain::Session s, std::string p) {
+            loaded = std::move(s);
+            fp     = std::move(p);
+         });
+         loop_.post([this, id, loaded = std::move(loaded),
+                     fp = std::move(fp)]() mutable {
+            loading_ = false;
+            if (!loaded || fp.empty())
+               emit(error_(id, "switch_session",
+                           "Session file is not a valid pi session"));
+            else {
+               session_ = std::move(*loaded);
+               emit(ok_(id, "switch_session",
+                        folly::dynamic::object("cancelled", false)));
+            }
+            pumpCommands();
+         });
       });
-      if (!loaded || loadedPath.empty())
-         return error_(id, "switch_session",
-                       "Session file is not a valid pi session");
-
-      session_ = std::move(*loaded);
-      return ok_(id, "switch_session",
-                 folly::dynamic::object("cancelled", false));
+      return folly::dynamic{};
    }
 
    // ---------- entries / tree ----------
@@ -655,7 +738,7 @@ private:
    auto sessionStateJson() const -> folly::dynamic {
       folly::dynamic d = folly::dynamic::object
          ("thinkingLevel", thinkingLevel())
-         ("isStreaming", false)("isCompacting", false)
+         ("isStreaming", busy_)("isCompacting", service_.compacting())
          ("steeringMode", steeringMode_)("followUpMode", followUpMode_)
          ("sessionId", session_.id())
          ("autoCompactionEnabled", compact_.autoEnabled())
@@ -728,10 +811,9 @@ private:
    std::istream&          in_;
    std::ostream&          out_;
 
-   // RPC 会话状态 (pi AgentSession 对应物); 模型/thinking 收编进 service.
+   // RPC 会话状态 (pi AgentSession 对应物); 模型/thinking/retry 收编进 service.
    std::string   steeringMode_          = "one-at-a-time";
    std::string   followUpMode_          = "one-at-a-time";
-   bool          autoRetryEnabled_      = true;
    std::deque<std::string> steering_;
    std::deque<std::string> followUp_;
    RpcEventSink            sink_;   // domain 事件 -> 线帧 (run() 注入 impl)

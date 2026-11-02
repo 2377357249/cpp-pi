@@ -35,6 +35,15 @@ struct TurnStateCtx {
    auto aborted() const -> bool {
       return abortRequested != nullptr && abortRequested->load();
    }
+
+   // ---- auto-retry 链状态 (pi auto_retry; run 起点复位) ----
+   // retryAttempt:   已完成的 backoff 次数 (attempt 从 1 起)
+   // retryInFlight:  backoff 已落地、重试 completion 尚未出结果
+   // retryCancelled: abort_retry 杀掉了 backoff sleep —— 链终止
+   size_t                          retryAttempt    = 0;
+   bool                            retryInFlight   = false;
+   bool                            retryCancelled  = false;
+   bool                            autoRetryEnabled = true;
 };
 
 } // namespace pi::domain

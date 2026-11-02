@@ -198,6 +198,26 @@ public:
       refresh_();
    }
 
+   // auto-retry -> 提示块 (pi TUI 的 hint 对应物)
+   auto autoRetryStart(size_t attempt, size_t, int64_t delayMs,
+                       std::string_view errorMessage) -> void override {
+      { std::lock_guard lk{m_.mu};
+        m_.blocks.push_back({BlockKind::Info,
+            std::format("auto-retry #{} in {}ms ({})", attempt, delayMs,
+                        errorMessage), {}, {}, {}, {}, false, true}); }
+      refresh_();
+   }
+   auto autoRetryEnd(bool success, size_t attempt,
+                     std::string_view finalError) -> void override {
+      { std::lock_guard lk{m_.mu};
+        m_.blocks.push_back({BlockKind::Info,
+            success ? std::format("auto-retry #{} succeeded", attempt)
+                    : std::format("auto-retry #{} failed: {}", attempt,
+                                  finalError),
+            {}, {}, {}, {}, false, true}); }
+      refresh_();
+   }
+
    // 前端维护的排队数 (非端口事件)
    auto setQueued(size_t n) -> void {
       { std::lock_guard lk{m_.mu}; m_.queued = n; }

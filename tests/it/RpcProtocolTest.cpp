@@ -804,3 +804,103 @@ TEST(RpcMode, CliModeProcessesQueue) {
    EXPECT_TRUE(out.find("echo: hello") != std::string::npos);
    EXPECT_TRUE(out.find("工具返回") != std::string::npos);
 }
+
+// == auto-retry: fail:<times>:<msg> 注错 → backoff → 重试/取消 ==========
+TEST(RpcMode, AutoRetryBackoffThenSucceeds) {
+   auto p = RpcProc::spawn();
+   p.send(R"({"type":"prompt","message":"fail:1:overloaded"})");
+   p.readResponse("prompt");
+   auto st = p.readUntil("auto_retry_start");
+   ASSERT_TRUE(st.isObject());
+   EXPECT_EQ(st["attempt"].getInt(), 1);
+   EXPECT_EQ(st["maxAttempts"].getInt(), 3);
+   EXPECT_GE(st["delayMs"].getInt(), 2000);
+   EXPECT_EQ(st["errorMessage"].getString(), "overloaded");
+   auto en = p.readUntil("auto_retry_end");
+   ASSERT_TRUE(en.isObject());
+   EXPECT_TRUE(en["success"].getBool());
+   EXPECT_EQ(en["attempt"].getInt(), 1);
+   EXPECT_TRUE(p.readUntil("agent_end").isObject());
+}
+
+// abort_retry 立即应答 + 杀 backoff sleep → auto_retry_end{success:false},
+// run 以原错误收尾 (链终止, 不再重试).
+TEST(RpcMode, AbortRetryCancelsBackoffSleep) {
+   auto p = RpcProc::spawn();
+   p.send(R"({"type":"prompt","message":"fail:3:rate limit"})");
+   p.readResponse("prompt");
+   ASSERT_TRUE(p.readUntil("auto_retry_start").isObject());
+   p.send(R"({"type":"abort_retry"})");
+   auto r = p.readResponse("abort_retry");
+   EXPECT_TRUE(r["success"].getBool());
+   auto en = p.readUntil("auto_retry_end");
+   ASSERT_TRUE(en.isObject());
+   EXPECT_FALSE(en["success"].getBool());
+   EXPECT_TRUE(p.readUntil("agent_end").isObject());
+}
+
+// set_auto_retry off → 可重试错误也直接收尾, 不发 auto_retry_*.
+TEST(RpcMode, SetAutoRetryOffSkipsBackoff) {
+   auto frames = RpcHarness::run(
+      R"({"type":"set_auto_retry","enabled":false})" "\n"
+      R"({"type":"prompt","message":"fail:1:overloaded"})" "\n");
+   EXPECT_TRUE(
+      RpcHarness::response(frames, "set_auto_retry")["success"].getBool());
+   EXPECT_TRUE(RpcHarness::ofType(frames, "auto_retry_start").empty());
+   EXPECT_TRUE(RpcHarness::ofType(frames, "auto_retry_end").empty());
+   EXPECT_EQ(RpcHarness::ofType(frames, "agent_end").size(), 1u);
+}
+
+// == RPC bash 协程化: run 在飞时 bash 命令照常并发执行 =====================
+TEST(RpcMode, BashCommandRunsWhileTurnInFlight) {
+   auto p = RpcProc::spawn(
+      {"--tools", "read,bash,edit,write,grep,find,ls,echo"});
+   p.send(R"({"type":"prompt","message":"tool:bash:{\"command\":\"sleep 1\"}"})");
+   p.readResponse("prompt");
+   p.send(R"({"type":"bash","command":"echo hi"})");
+   bool sawBashBeforeEnd = false;
+   for (;;) {
+      auto f = p.readFrame();
+      ASSERT_TRUE(f.isObject()) << "EOF before agent_end";
+      auto const t = f["type"].getString();
+      if (t == "response" && f["command"].getString() == "bash") {
+         EXPECT_TRUE(f["success"].getBool());
+         EXPECT_EQ(f["data"]["output"].getString(), "hi\n");
+         EXPECT_FALSE(f["data"]["cancelled"].getBool());
+         sawBashBeforeEnd = true;
+      }
+      if (t == "agent_end") break;
+   }
+   EXPECT_TRUE(sawBashBeforeEnd);
+   // streaming 中完成的 bashExecution 记录延迟到 run 末落库 (pi)
+   p.send(R"({"type":"get_entries"})");
+   auto e = p.readResponse("get_entries");
+   bool sawBashEntry = false;
+   for (auto const& en : e["data"]["entries"])
+      if (en["type"].getString() == "message"
+          && en["message"]["role"].getString() == "bashExecution")
+         sawBashEntry = true;
+   EXPECT_TRUE(sawBashEntry);
+}
+
+// abort_bash 杀掉在飞命令 (进程组终止), 响应带 cancelled=true 快速返回.
+TEST(RpcMode, AbortBashKillsRunningCommand) {
+   auto p = RpcProc::spawn();
+   auto const t0 = std::chrono::steady_clock::now();
+   p.send(R"({"type":"bash","command":"sleep 30"})");
+   p.send(R"({"type":"abort_bash"})");
+   folly::dynamic bashResp;
+   for (;;) {
+      auto f = p.readFrame();
+      ASSERT_TRUE(f.isObject()) << "EOF before bash response";
+      if (f["type"].getString() == "response"
+          && f["command"].getString() == "abort_bash")
+         EXPECT_TRUE(f["success"].getBool());
+      if (f["type"].getString() == "response"
+          && f["command"].getString() == "bash") { bashResp = f; break; }
+   }
+   auto const elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+      std::chrono::steady_clock::now() - t0).count();
+   EXPECT_LT(elapsed, 15);   // sleep 30 被杀, 不可能跑满
+   EXPECT_TRUE(bashResp["data"]["cancelled"].getBool());
+}

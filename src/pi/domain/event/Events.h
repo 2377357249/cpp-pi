@@ -15,6 +15,7 @@ enum AgentEvent : EV_NS::EventId {
    EV_STORE_DONE = 4,  // 一批消息已落盘
    EV_LOAD_DONE  = 5,  // 历史加载完成
    EV_ABORT      = 6,  // 用户中止
+   EV_RETRY_DUE  = 7,  // auto-retry backoff 到期 (或被 abort_retry 取消)
 };
 
 // 消息体: 真实数据经 context 碎片传递, 这些仅作信标
@@ -24,5 +25,6 @@ struct UserInputMsg  { char _{}; };
 struct StoreDoneMsg  { char _{}; };
 struct LoadDoneMsg   { char _{}; };
 struct AbortMsg      { char _{}; };
+struct TimerDoneMsg  { char _{}; };
 
 } // namespace pi::domain

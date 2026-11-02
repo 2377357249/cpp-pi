@@ -11,21 +11,26 @@
 #include <trans-dsl/trans-dsl.h>
 
 #include <pi/interface/trans/AgentTurn.h>
+#include <pi/interface/trans/CompactProc.h>
 #include <pi/domain/AgentTurnImpl.h>
+#include <pi/domain/compaction/CompactionPolicy.h>
 #include <pi/domain/model/ModelCatalog.h>
 #include <pi/domain/session/ISessionStore.h>
 #include <pi/infra/async/EventLoop.h>
+#include <pi/infra/async/ThreadPool.h>
 
 namespace pi::iface {
 
 // ---------------------------------------------------------------------------
 // 应用服务: 持有 AgentTurnImpl(DCI 合流对象), 在 EventLoop owner 线程上
-// 驱动 AgentTurn 事务.
-//   startTurn 启动一轮 run 后立即返回 —— 事务在 WAIT_ON 处挂起, 异步
-//   源 (LLM/工具/存储) 的回调经适配器 marshal 回 loop 线程 post 事件,
-//   EventQueueCtx::onPost 钩子安排 deferred pump 恢复事务. 领域态只在
-//   loop 线程被触碰; pump 用 pumping_ 防重入 (post 可能发生在
-//   handleEvent 调用栈内).
+// 驱动两条事务类型 —— AgentTurn (run) 与 CompactProc (压缩), 任一时刻
+// 只有一条活跃, 事件经同一 EventQueueCtx 邮箱按活跃事务分发.
+//   startTurn/startCompact 启动后立即返回 —— 事务在 WAIT_ON 处挂起,
+//   异步源 (LLM/工具/存储/backoff) 的回调经适配器 marshal 回 loop 线程
+//   post 事件, EventQueueCtx::onPost 钩子安排 deferred pump 恢复事务.
+//   领域态只在 loop 线程被触碰; pump 用 pumping_ 防重入.
+//   abort 旗标由本服务自持 (impl_.abortRequested 指向它): 前端调
+//   requestAbort, 事务谓词/工具派发/backoff/bash spawn 周期检查.
 // ---------------------------------------------------------------------------
 class AgentSessionService {
 public:
@@ -33,34 +38,29 @@ public:
 
    AgentSessionService(domain::Session&       session,
                        domain::ILlmProvider&  turnLlm,
-                       domain::ILlmProvider&  oneShotLlm,
                        domain::IToolExecutor& tools,
                        domain::ISessionStore& store,
                        std::string            systemPrompt,
-                       infra::EventLoop&      loop)
-      : oneShotLlm_{oneShotLlm}
-      , impl_{session, turnLlm, tools, store, std::move(systemPrompt)}
+                       infra::EventLoop&      loop,
+                       infra::ThreadPool&     ioPool)
+      : impl_{session, turnLlm, tools, store, std::move(systemPrompt),
+              ioPool, loop}
       , loop_{loop} {
+      impl_.abortRequested = &abortRequested_;
       impl_.onPost = [this] { loop_.post([this] { pump(); }); };
    }
 
-   // 事务外一次性 completion (compaction 摘要等). provider 契约: 最终调一次
-   // done; 走同步 oneShotLlm_ —— 阻塞 loop 线程, 协程化留待 Compact proc.
-   // 摘要路径的增量事件不上线 (pi 的摘要流不经 agent event 转发).
-   auto completeOnce(domain::CompletionRequest req) -> domain::CompletionResult {
-      std::optional<domain::CompletionResult> out;
-      oneShotLlm_.complete(std::move(req),
-                    [](domain::AssistantStreamEvent const&) {},
-                    [&out](domain::CompletionResult r) { out = std::move(r); });
-      return out.value_or(domain::CompletionResult{
-         domain::Message{domain::Role::Assistant, {}, {}, {}},
-         domain::StopReason::Error});
-   }
+   // ---------- abort (pi agent.abort) ----------
+   // 旗标自持: 事务谓词 (TurnDone/ToolRunner/Completer)、bash spawn 的
+   // aborted 钩子、provider abortCheck、Retryer backoff 都读同一个原子量.
+   auto requestAbort() -> void { abortRequested_ = true; }
+   auto aborted() const -> bool { return abortRequested_.load(); }
 
-   // pi agent.abort(): 注入外部中止旗标 (RPC 前端持有的 atomic).
-   auto setAbortFlag(std::atomic<bool>& flag) -> void {
-      impl_.abortRequested = &flag;
-   }
+   // abort_retry: 只杀在飞的 backoff sleep, 不动 run 本身.
+   auto cancelRetry() -> void { impl_.Retryer::cancel(); }
+
+   // set_auto_retry: 重试链开关 (pi settings.retry.enabled)
+   auto setAutoRetry(bool v) -> void { impl_.autoRetryEnabled = v; }
 
    // RPC 前端注入事件汇; 未注入时 impl_.sink 是 Null (CLI/测试).
    auto setEventSink(domain::IAgentEventSink& sink) -> void {
@@ -128,13 +128,21 @@ public:
       providerChange_ = std::move(fn);
    }
 
-   auto running() const -> bool { return turn_.has_value(); }
+   // ---------- 事务驱动 ----------
+   auto running() const -> bool { return turn_.has_value() || compactTx_; }
+   auto compacting() const -> bool { return compactTx_.has_value(); }
 
    // pi runAgentLoop: agent_start → turn_start → 输入消息 message_* →
    // 事务化 inner loop (每轮 turn_* 边界由 Completer/TurnReporter 发射) →
    // agent_end{messages: 本轮全部新消息}. 立即返回; 收尾经 onDone.
    auto startTurn(std::string   userInput,
                   RunDoneHandler onDone) -> void {
+      // 一轮新 run 起点: abort/retry 链状态复位 (旗标只影响在飞的 run)
+      abortRequested_       = false;
+      impl_.retryAttempt    = 0;
+      impl_.retryInFlight   = false;
+      impl_.retryCancelled  = false;
+
       // unpersisted() 天然覆盖轮次间隙的命令 entry (sessionInfo/thinkingLevel)
       // 和本轮 user 消息, 无需 turn 起点标界.
       auto& sink = *impl_.sink;
@@ -159,7 +167,42 @@ public:
       pump();
    }
 
-   // 同步版 (CLI/TUI worker 线程): 内嵌跑 loop 直到本轮 run 收尾.
+   // pi agent-session.compact: prep 由调用方在 loop 线程算好 (同步纯函数),
+   // 摘要/落盘走 CompactProc 事务协程式挂起; 完成经 onDone 回 status.
+   auto startCompact(domain::CompactionPreparation prep,
+                     std::string reason, std::string instructions,
+                     bool willRetry,
+                     RunDoneHandler done) -> void {
+      // compact 是 preempt 命令: 它置的 abort 旗标本是杀前一个 run 的,
+      // 事务起点必须复位 —— 否则 settleSummarize 首跳即 "cancelled".
+      // 压缩中途到达的 abort 会重新置位, 仍可取消.
+      abortRequested_ = false;
+      domain::CompactCtx& cx = impl_;   // impl IS-A CompactCtx
+      cx.prep         = std::move(prep);
+      cx.reason       = std::move(reason);
+      cx.instructions = std::move(instructions);
+      cx.willRetry    = willRetry;
+      // phase 对齐首个要跑的 Summarize: 无历史可摘要时第一跳直接 Prefix,
+      // 否则第二个 __optional 会拿 History prompt 去摘要 prefix 消息.
+      cx.phase        = cx.prep->messagesToSummarize.empty()
+                           ? domain::CompactCtx::Phase::Prefix
+                           : domain::CompactCtx::Phase::History;
+      cx.lastResult.reset();
+      cx.historySummary.clear(); cx.prefixSummary.clear();
+      cx.historyUsage = {};      cx.prefixUsage = {};
+      cx.hasHistory = false;     cx.hasPrefix = false;
+      cx.error.clear();          cx.aborted = false;
+      cx.summary.clear();        cx.usage = {};
+      cx.detailsJson.clear();
+
+      compactDone_ = std::move(done);
+      compactTx_.emplace();
+      compactTx_->updateUserContext(&impl_);
+      status_ = compactTx_->start();
+      pump();
+   }
+
+   // 同步版 (CLI 主循环): 内嵌跑 loop 直到本轮 run 收尾.
    auto runTurn(std::string userInput) -> TSL_NS::Status {
       TSL_NS::Status st = TSL_NS::Result::SUCCESS;
       startTurn(std::move(userInput),
@@ -171,22 +214,24 @@ public:
    auto impl() -> domain::AgentTurnImpl& { return impl_; }
 
 private:
-   // 泵送事务: 队列事件逐个喂 handleEvent 直到 working 队列空.
-   // 事务脱离 working 即 finish —— onDone 可能链式启动下一轮.
+   // 泵送事务: 队列事件逐个喂活跃事务的 handleEvent 直到 working 队列空.
    auto pump() -> void {
       if (pumping_) return;
       pumping_ = true;
-      while (turn_ && TSL_NS::is_working_status(status_)
+      while ((turn_ || compactTx_) && TSL_NS::is_working_status(status_)
              && !impl_.queue.empty()) {
          auto& front = impl_.queue.front();
          EV_NS::ConsecutiveEventInfo info{front.id, front.bytes.data(),
                                         front.size};
          EV_NS::Event event{info};
-         status_ = turn_->handleEvent(event);
+         status_ = turn_ ? turn_->handleEvent(event)
+                         : compactTx_->handleEvent(event);
          impl_.queue.pop_front();
       }
       pumping_ = false;
       if (turn_ && !TSL_NS::is_working_status(status_)) finish();
+      else if (compactTx_ && !TSL_NS::is_working_status(status_))
+         finishCompact();
    }
 
    auto finish() -> void {
@@ -201,15 +246,26 @@ private:
       if (done) done(st);
    }
 
-   domain::ILlmProvider&  oneShotLlm_;
+   auto finishCompact() -> void {
+      auto st   = status_;
+      auto done = std::move(compactDone_);
+      compactDone_ = nullptr;
+      compactTx_.reset();     // compacting() 在回调内已假
+      if (done) done(st);
+   }
+
    domain::AgentTurnImpl  impl_;
    infra::EventLoop&      loop_;
    domain::ModelCatalog   catalog_;
    std::function<bool(std::string_view)> providerChange_;
 
+   std::atomic<bool>     abortRequested_{false};
+
    std::optional<MonitoredAgentTurn> turn_;
+   std::optional<CompactProc>        compactTx_;
    TSL_NS::Status        status_  = TSL_NS::Result::SUCCESS;
    RunDoneHandler        onDone_;
+   RunDoneHandler        compactDone_;
    size_t                baseIdx_ = 0;
    bool                  pumping_ = false;
 };

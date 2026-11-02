@@ -97,6 +97,28 @@ public:
                ("messages", std::move(arr))("willRetry", willRetry));
    }
 
+   // pi auto_retry_start{attempt,maxAttempts,delayMs,errorMessage}
+   auto autoRetryStart(size_t attempt, size_t maxAttempts,
+                       int64_t delayMs,
+                       std::string_view errorMessage) -> void override {
+      emit_(folly::dynamic::object("type", "auto_retry_start")
+               ("attempt", static_cast<int64_t>(attempt))
+               ("maxAttempts", static_cast<int64_t>(maxAttempts))
+               ("delayMs", delayMs)
+               ("errorMessage", std::string{errorMessage}));
+   }
+
+   // pi auto_retry_end{success,attempt,finalError?}
+   auto autoRetryEnd(bool success, size_t attempt,
+                     std::string_view finalError) -> void override {
+      auto f = folly::dynamic::object("type", "auto_retry_end")
+                  ("success", success)
+                  ("attempt", static_cast<int64_t>(attempt));
+      if (!finalError.empty())
+         f("finalError", std::string{finalError});
+      emit_(std::move(f));
+   }
+
 private:
    Emit emit_;
 };
