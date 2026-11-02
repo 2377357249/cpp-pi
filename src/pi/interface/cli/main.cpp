@@ -11,6 +11,7 @@
 #include <pi/domain/session/Session.h>
 #include <pi/infra/async/EventLoop.h>
 #include <pi/infra/async/ThreadPool.h>
+#include <pi/infra/messaging/PubSub.h>
 #include <pi/infra/config/CodexConfig.h>
 #include <pi/infra/util/Ids.h>
 #include <pi/interface/adapter/llm/AsyncLlmProvider.h>
@@ -137,6 +138,7 @@ int main(int argc, char** argv) {
    //   llmPool: 跑同步 curl 的专用线程 (一次只有一个 completion 在飞);
    //   toolPool: 跑 bash 子进程/文件扫描, 支持并行 tool calls.
    pi::infra::EventLoop loop;
+   pi::infra::InMemoryPubSub internalBus;
    constexpr size_t     kLlmWorkers  = 1;
    constexpr size_t     kToolWorkers = 4;
 
@@ -159,7 +161,7 @@ int main(int argc, char** argv) {
    pi::iface::AgentSessionService  service{
       session, asyncLlm, tools, *store,
       "You are cpp-pi, a DDD + DCI + trans-dsl rewrite of pi.",
-      loop, toolPool};
+      loop, toolPool, internalBus};
 
    // abort 链路: service 自持旗标 -> 工具派发检查/bash spawn 杀进程树/
    // provider 断 SSE 流, 三方共用同一个原子量.

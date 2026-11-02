@@ -8,6 +8,7 @@
 
 #include <event/impl/ConsecutiveEventInfo.h>
 #include <event/concept/Event.h>
+#include <folly/json/json.h>
 #include <trans-dsl/trans-dsl.h>
 
 #include <pi/interface/trans/AgentTurn.h>
@@ -18,6 +19,7 @@
 #include <pi/domain/session/ISessionStore.h>
 #include <pi/infra/async/EventLoop.h>
 #include <pi/infra/async/ThreadPool.h>
+#include <pi/infra/messaging/PubSub.h>
 
 namespace pi::iface {
 
@@ -42,10 +44,12 @@ public:
                        domain::ISessionStore& store,
                        std::string            systemPrompt,
                        infra::EventLoop&      loop,
-                       infra::ThreadPool&     ioPool)
+                       infra::ThreadPool&     ioPool,
+                       infra::IPubSub&        internalBus)
       : impl_{session, turnLlm, tools, store, std::move(systemPrompt),
               ioPool, loop}
-      , loop_{loop} {
+      , loop_{loop}
+      , internalBus_{internalBus} {
       impl_.abortRequested = &abortRequested_;
       impl_.onPost = [this] { loop_.post([this] { pump(); }); };
    }
@@ -153,6 +157,9 @@ public:
       sink.turnStart();
       sink.messageStart(userMsg);
       sink.messageEnd(userMsg);
+      internalBus_.publish({
+         "agent.turn.started",
+         folly::toJson(folly::dynamic::object("sessionId", impl_.session.id()))});
 
       // run 作用域的发射态复位 (一个 run 可含多个 assistant round)
       impl_.lastAssistant.reset();
@@ -239,6 +246,10 @@ private:
       impl_.sink->agentEnd(
          std::vector<domain::Message>{msgs.begin() + baseIdx_, msgs.end()},
          /*willRetry=*/false);
+      internalBus_.publish({
+         "agent.turn.finished",
+         folly::toJson(folly::dynamic::object("sessionId", impl_.session.id())
+                                       ("status", static_cast<int64_t>(status_)))});
       auto st   = status_;
       auto done = std::move(onDone_);
       onDone_   = nullptr;
@@ -256,6 +267,7 @@ private:
 
    domain::AgentTurnImpl  impl_;
    infra::EventLoop&      loop_;
+   infra::IPubSub&        internalBus_;
    domain::ModelCatalog   catalog_;
    std::function<bool(std::string_view)> providerChange_;
 

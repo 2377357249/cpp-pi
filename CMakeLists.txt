@@ -85,6 +85,7 @@ enable_testing()
 
 file(GLOB_RECURSE CPP_PI_IT_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
 add_executable(cpp-pi-it ${CPP_PI_IT_SOURCES})
+target_include_directories(cpp-pi-it PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(cpp-pi-it PRIVATE GTest::gtest_main folly_json)
 target_compile_definitions(cpp-pi-it PRIVATE
    CPP_PI_BIN="$<TARGET_FILE:cpp-pi>")
