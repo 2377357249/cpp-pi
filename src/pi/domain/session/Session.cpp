@@ -61,27 +61,24 @@ auto Session::appendLoaded(Entry e) -> Entry const& {
    return entries_.emplace_back(std::move(e));
 }
 
-auto Session::appendUser(std::string text) -> void {
+auto Session::appendUser(std::string text) -> Message {
    Message m{Role::User, std::move(text), {}, {}};
-   m.timestampMs = nowMs();
-   appendEntry(Entry{EntryBase{}, MessageEntry{std::move(m)}});
+   return appendMessage(std::move(m));
 }
 
-auto Session::appendAssistant(Message msg) -> void {
+auto Session::appendAssistant(Message msg) -> Message {
    msg.role = Role::Assistant;
-   if (msg.timestampMs == 0) msg.timestampMs = nowMs();
-   appendEntry(Entry{EntryBase{}, MessageEntry{std::move(msg)}});
+   return appendMessage(std::move(msg));
 }
 
 auto Session::appendToolResults(std::vector<ToolResult> const& results) -> void {
-   for (auto const& r : results) {
-      Message m{Role::Tool, r.content, {}, r.toolCallId, r.toolName, r.isError};
-      m.images      = r.images;
-      m.detailsJson = r.detailsJson;
-      m.durationMs  = r.durationMs;
-      m.timestampMs = nowMs();
-      appendEntry(Entry{EntryBase{}, MessageEntry{std::move(m)}});
-   }
+   for (auto const& r : results) appendMessage(toolResultMessage(r));
+}
+
+auto Session::appendMessage(Message msg) -> Message {
+   if (msg.timestampMs == 0) msg.timestampMs = nowMs();
+   appendEntry(Entry{EntryBase{}, MessageEntry{msg}});
+   return msg;
 }
 
 // ---------------------------------------------------------------------------

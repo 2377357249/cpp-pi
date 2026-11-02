@@ -6,6 +6,7 @@
 #include <folly/json/json.h>
 
 #include <pi/domain/llm/StopReason.h>
+#include <pi/domain/llm/StreamEvent.h>
 #include <pi/domain/message/Message.h>
 #include <pi/domain/session/Session.h>
 #include <pi/infra/util/JsonSafe.h>
@@ -184,9 +185,7 @@ inline auto messageToJson(domain::Message const& m) -> folly::dynamic {
       ("provider", m.provider.empty() ? "mock"   : m.provider)
       ("model",    m.model.empty()    ? "mock-1" : m.model)
       ("usage", usageToJson(m.usage))
-      ("stopReason", domain::toWire(m.stopReason == domain::StopReason::Pending
-                                       ? domain::stopReasonOf(m)
-                                       : m.stopReason))
+      ("stopReason", domain::toWire(m.stopReason))
       ("timestamp", ts);
    if (!m.responseModel.empty())  d["responseModel"]  = m.responseModel;
    if (!m.responseId.empty())     d["responseId"]     = m.responseId;
@@ -200,6 +199,74 @@ inline auto messagesToJson(domain::Session const& s) -> folly::dynamic {
    auto arr = folly::dynamic::array();
    for (auto const& m : s.messages()) arr.push_back(messageToJson(m));
    return arr;
+}
+
+// ---------------------------------------------------------------------------
+// json-event.ts toJsonAssistantMessageEvent: 剥 partial;
+// toolcall_start 展开 {id, toolName}; start/done/error 不上 update 帧
+// (返回 null dynamic 表示不产生 assistantMessageEvent).
+// ---------------------------------------------------------------------------
+inline auto assistantStreamEventJson(domain::AssistantStreamEvent const& e)
+   -> folly::dynamic {
+   using T = domain::AssistantStreamType;
+   auto ci = [](folly::dynamic d, int i) {
+      d["contentIndex"] = i;
+      return d;
+   };
+   switch (e.type) {
+      case T::TextStart:
+         return ci(folly::dynamic::object("type", "text_start"),
+                   e.contentIndex);
+      case T::TextDelta:
+         return ci(folly::dynamic::object("type", "text_delta")
+                                        ("delta", e.delta), e.contentIndex);
+      case T::TextEnd:
+         return ci(folly::dynamic::object("type", "text_end")
+                                        ("content", e.delta), e.contentIndex);
+      case T::ThinkingStart:
+         return ci(folly::dynamic::object("type", "thinking_start"),
+                   e.contentIndex);
+      case T::ThinkingDelta:
+         return ci(folly::dynamic::object("type", "thinking_delta")
+                                        ("delta", e.delta), e.contentIndex);
+      case T::ThinkingEnd:
+         return ci(folly::dynamic::object("type", "thinking_end")
+                                        ("content", e.delta), e.contentIndex);
+      case T::ToolCallStart:
+         return ci(folly::dynamic::object("type", "toolcall_start")
+                                        ("id", e.toolCallId)
+                                        ("toolName", e.toolName),
+                   e.contentIndex);
+      case T::ToolCallDelta:
+         return ci(folly::dynamic::object("type", "toolcall_delta")
+                                        ("delta", e.delta), e.contentIndex);
+      case T::ToolCallEnd: {
+         folly::dynamic tc = folly::dynamic::object("type", "toolCall")
+            ("id", e.toolCall.id)("name", e.toolCall.tool)
+            ("arguments", inputToDynamic(e.toolCall.input));
+         return ci(folly::dynamic::object("type", "toolcall_end")
+                                        ("toolCall", std::move(tc)),
+                   e.contentIndex);
+      }
+      default: return folly::dynamic{};
+   }
+}
+
+// tool_execution_end 帧的 result 对象: {content:[text|image 块], details?}
+// (pi emitToolExecutionEnd 的 finalized.result)
+inline auto toolResultPayloadJson(domain::Message const& m) -> folly::dynamic {
+   auto content = folly::dynamic::array();
+   if (!m.text.empty())
+      content.push_back(folly::dynamic::object("type", "text")
+                                             ("text", m.text));
+   for (auto const& im : m.images) content.push_back(imageToJson(im));
+   folly::dynamic result = folly::dynamic::object("content",
+                                                std::move(content));
+   if (!m.detailsJson.empty()) {
+      if (auto d = infra::parseJsonSafe(m.detailsJson))
+         result["details"] = *d;
+   }
+   return result;
 }
 
 // ---------------------------------------------------------------------------

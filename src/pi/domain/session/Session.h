@@ -24,9 +24,13 @@ public:
       : id_(std::move(id)), cwd_(std::move(cwd)) {}
 
    // ---- 追加 (entry 生成: id/parentId=leafId_/timestamp 自动补) ----
-   auto appendUser(std::string text) -> void;
-   auto appendAssistant(Message msg) -> void;
+   // appendXxx 返回已入库的消息副本 (timestamp 已钉), 供事件发射保证
+   // emitted == persisted.
+   auto appendUser(std::string text) -> Message;
+   auto appendAssistant(Message msg) -> Message;
    auto appendToolResults(std::vector<ToolResult> const& results) -> void;
+   // 通用消息追加: 保留调用方字段, 仅补 timestamp
+   auto appendMessage(Message msg) -> Message;
    // 低层: 手写 payload 的追加; 返回已入库 entry 引用
    auto appendEntry(Entry e) -> Entry const&;
    // 加载专用: 原样入库 (不自动链 parentId, 不覆盖已有 id/timestamp)

@@ -55,6 +55,11 @@ target_link_libraries(folly_json PUBLIC fmt::fmt glog::glog)
 
 add_subdirectory(third_party/quill)
 
+# ftxui: TUI 前端 (interface/tui); 只要库本体
+set(FTXUI_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+set(FTXUI_MICROSOFT_TERMINAL_FALLBACK OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/ftxui)
+
 option(CPP_PI_COVERAGE "clang 源码级覆盖率插桩" OFF)
 
 # ---------------------------------------------------------------------------
@@ -63,7 +68,8 @@ option(CPP_PI_COVERAGE "clang 源码级覆盖率插桩" OFF)
 file(GLOB_RECURSE CPP_PI_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 add_executable(cpp-pi ${CPP_PI_SOURCES})
 target_include_directories(cpp-pi PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
-target_link_libraries(cpp-pi PRIVATE trans-dsl folly_json quill curl)
+target_link_libraries(cpp-pi PRIVATE trans-dsl folly_json quill curl
+   ftxui::component)
 
 if(CPP_PI_COVERAGE)
    target_compile_options(cpp-pi PRIVATE -fprofile-instr-generate -fcoverage-mapping)

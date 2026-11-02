@@ -7,6 +7,7 @@
 
 #include <pi/domain/AgentTurnImpl.h>
 #include <pi/application/actions/ExecuteTools.h>
+#include <pi/application/actions/FinishTurn.h>
 #include <pi/application/actions/PersistDelta.h>
 #include <pi/application/actions/RequestCompletion.h>
 #include <pi/domain/context/TurnStateCtx.h>
@@ -37,6 +38,7 @@ using AgentTurn = __transaction
 ( TSL_NS::details::Loop<MAX_TURN_ITERATIONS,
       __with_id(1, __asyn(app::RequestCompletion))
     , __with_id(2, __asyn(app::ExecuteTools))
+    , __with_id(3, __asyn(app::FinishTurn))
     , __with_id(5, __asyn(app::PersistDelta))
     , __until(TurnDone)
    >
@@ -46,7 +48,7 @@ using AgentTurn = __transaction
 // 可观测性: telemetry / footer 状态条的雏形.
 // __with_id 给 action 打上 AID, 监听器只观测关心的生命周期.
 // ---------------------------------------------------------------------------
-struct TurnObserver : TSL_NS::ObservedActionIdRegistry<1, 2, 5> {
+struct TurnObserver : TSL_NS::ObservedActionIdRegistry<1, 2, 3, 5> {
    auto onActionStarting(TSL_NS::ActionId aid, TSL_NS::TransactionInfo const&) -> void {
       if (auto* lg = pi::infra::log::logger())
          LOG_INFO(lg, "turn: action #{} starting", aid);

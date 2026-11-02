@@ -112,6 +112,34 @@ ToolCalls = __procedure( PermissionGate → ExecTool → Report );
 - `interface/rpc/`：stdin 行 → `RpcCommand` → 服务命令（prompt→runTurn；abort→`EV_ABORT`/`stop()` 待接）；新增消息 → pi AgentEvent 形状的 streaming 行。
 - 命令面照抄 `rpc-types.ts` 全集（见第 8 节迁移表），响应/event 字段与其对齐 ⇒ TS 前端零改动。
 - JSON：`folly::dynamic`/`folly::json`（vendored 子集）。
+- **事件出口统一走 `IAgentEventSink`**（domain 端口）：role 在事件发生点同步回调，
+  前端注入各自实现——`RpcEventSink` 序列化成线帧上 stdout，`TuiEventSink` 更新聊天模型，
+  CLI 用 Null。语义 = pi `runAgentLoop`：turn_start/end 按 assistant round 发，
+  `message_update` 携带 `assistantStreamEvent`（`text_delta`/`thinking_delta`/`toolcall_*`），
+  `thinking_end` 带 `content` 全文而非 `delta`；tool_execution_start 逐个宣布、
+  每个 start 恰好配对一份 result（abort 落在派发中时回 "Operation aborted"）。
+
+## 7.5 模型目录 / 思维链 / 会话共享件
+
+- **模型**：`domain/context/ModelCtx` 存活跃 `Model` 值对象 + `thinkingLevel`；
+  `domain/model/ModelCatalog`（静态条目 + `~/.pi/agent/models.json` 覆盖合并，
+  `interface/adapter/model/ModelCatalogLoader`）。`CompletionRequest` 携带**整个 Model**
+  （provider 需要 `reasoning` 等能力标志，不止 id）+ `thinkingLevel`。
+- **provider 切换**：`LlmProviderMux`（`interface/adapter/llm/`）按 `model.provider`
+  路由到已注册 provider，切模型不重建事务；`AgentSessionService::setModel` 对
+  非 reasoning 模型把 thinkingLevel 收敛为 "off"；`cycleModel(dir)` 在**全目录**上
+  轮转（跨 provider，pi 语义），≤1 候选返回 null。`--provider mock` 模式下目录
+  密封为纯 mock 条目（不读 codex 目录/不注册真 provider，离线保证）。
+- **思维链**：provider 产生 `ThinkingStart/Delta/End` 流事件 → `thinking_start/
+  thinking_delta/thinking_end` 线帧 + 持久化 `thinking` content block。mock provider
+  在 `model.reasoning && level!="off"` 时发确定性 thinking；OpenAiProvider 走
+  Responses SSE（`httpPostJsonStream`），`reasoning_summary_text_*`/`reasoning_text_*`
+  翻译成 thinking 流，`reasoning.effort` 映射 thinkingLevel，encrypted reasoning
+  项回放（`store:false` 端点要求）。
+- **会话共享件**（RPC/TUI 复用，避免各抄一份）：`domain/session/SessionFork`
+  （fork/clone 分支语义）、`interface/trans/CompactRunner`（manual/auto compaction
+  全流程+回调）、`interface/session/SessionExport`（HTML 导出）、
+  `ISessionStore::list(cwd)`（`/resume` 会话枚举，JsonlSessionStore 扫目录头条目）。
 
 ## 8. pi → cpp-pi 功能迁移路线
 
@@ -128,7 +156,7 @@ ToolCalls = __procedure( PermissionGate → ExecTool → Report );
 | permission/approval | `PermissionGate` proc + `EV_PERMISSION_RSP` | P2 |
 | MCP | `interface/adapter/mcp` client | P3 |
 | skills/extensions/slash-commands | domain/application 资源加载 | P3 |
-| `tui` | **不迁移——前端保持 TS 版不变** | — |
+| `tui` | **不迁移 pi TS 版**; 纯 C++ TUI `interface/tui/`（vendored FTXUI，`ChatModel`+`TuiEventSink` 复用 `IAgentEventSink` 实时渲染；slash 命令面/模型·thinking·session 选择器/Ctrl+P 切模型·Shift-Tab thinking·Ctrl-T 思维链显隐·Ctrl-O 工具输出展开；footer=模型/thinking/queued/tokens/ctx%） | ✅ 功能对齐（PTY 冒烟验证） |
 | `durable` | `JournalCtx` 事件重放 | P4 |
 | telemetry | 监听器体系 | P4 |
 
@@ -144,6 +172,7 @@ ToolCalls = __procedure( PermissionGate → ExecTool → Report );
 | boost-headers(按需子集) | `third_party/boost-headers` | folly 头文件闭包（~38MB, 非全量 179MB） |
 | quill | `third_party/quill` | 异步日志: stderr console + 文件每分钟滚动×30 备份 ≈ 保留 30 分钟 |
 | libcurl | macOS 系统库（非 brew） | `infra/http` 当前 HTTP 后端 |
+| **ftxui** | `third_party/ftxui`（v6.1.9 vendored） | `--mode tui` 全屏界面 |
 | **proxygen** | 待 vendor | HTTPS+SSE 流式/并发，替换 libcurl |
 
 - 前端协议走 stdin/stdout NDJSON，**不需要 socket 库**。

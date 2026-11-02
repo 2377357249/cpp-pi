@@ -32,12 +32,12 @@
 | clear_queue | 快照两队列→清→agent.clearAllQueues→queue_update(空)先于响应 | ✅ |
 | new_session | `{parentSession?}`(写进 header 的 parentSession=文件路径); session_before_switch 可 cancel→{cancelled:true}; 旧 agent_settled 先发; session_start{reason:"new"}; 响应在 rebind 后 | 🟡 parentSession/事件/cancel 缺 |
 | get_state | 字段对照表见 §2 | 🟡 部分 |
-| set_model | getAvailableSnapshot 查 provider+id; miss→`"Model not found: p/m"`; checkAuth 失败→`"No API key for p/m"`; append model_change entry; 思考级 resolved (scoped→settings→global→current→medium) 可能发 thinking_level_changed; model_select 事件; 返回 Model 对象 | 🟡 无 lookup/entry/事件 |
-| cycle_model | scoped 或全量可用列表; ≤1 候选→`data:null`(显式null非省略); `(cur+1)%len`; 返回 `{model,thinkingLevel,isScoped}` | 🟡 形状不对 |
-| get_available_models | `{models:Model[]}` 全目录 | 🟡 单条 |
-| set_thinking_level | 不在可用级→clamp; 有效变化→thinking_level_change entry+thinking_level_changed 事件+thinking_level_select; 7级: off/minimal/low/medium/high/xhigh/max | 🟡 无 entry/事件/clamp |
-| cycle_thinking_level | !model?.reasoning→`data:null`; else `(i+1)%levels` over getSupportedThinkingLevels (非 reasoning→["off"]; xhigh/max 需 thinkingLevelMap) | 🟡 七级轮转但不判 reasoning |
-| get_available_thinking_levels | 无模型→全7级; 有→getSupportedThinkingLevels | 🟡 恒7 |
+| set_model | getAvailableSnapshot 查 provider+id; miss→`"Model not found: p/m"`; checkAuth 失败→`"No API key for p/m"`; append model_change entry; 思考级 resolved (scoped→settings→global→current→medium) 可能发 thinking_level_changed; model_select 事件; 返回 Model 对象 | ✅ 目录校验+entry; thinking 按能力收敛; 缺 model_select 事件/checkAuth  |
+| cycle_model | scoped 或全量可用列表; ≤1 候选→`data:null`(显式null非省略); `(cur+1)%len`; 返回 `{model,thinkingLevel,isScoped}` | ✅ 全目录跨provider轮转+ModelCycleResult形状; 缺 scoped  |
+| get_available_models | `{models:Model[]}` 全目录 | ✅ 全目录  |
+| set_thinking_level | 不在可用级→clamp; 有效变化→thinking_level_change entry+thinking_level_changed 事件+thinking_level_select; 7级: off/minimal/low/medium/high/xhigh/max | ✅ entry+事件; 缺clamp/thinking_level_select  |
+| cycle_thinking_level | !model?.reasoning→`data:null`; else `(i+1)%levels` over getSupportedThinkingLevels (非 reasoning→["off"]; xhigh/max 需 thinkingLevelMap) | ✅ reasoning判null; 缺支持级表  |
+| get_available_thinking_levels | 无模型→全7级; 有→getSupportedThinkingLevels | ✅ reasoning→["off"]  |
 | set_steering_mode | `agent.steeringMode` + settings 持久化 | 🟡 存内存,默认错 |
 | set_follow_up_mode | 同上 | 🟡 同 |
 | compact | abort→compaction_start{reason:"manual"}→无模型→noModel error→prepare: 尾已是compaction→"Already compacted"/太小→"Nothing to compact (session too small)"→session_before_compact(cancel→"Compaction cancelled"/{compaction}→采用)→LLM 摘要(summarization_retry_* 事件)→appendCompaction→compaction_end{reason,result,aborted,willRetry}; 失败→compaction_end{errorMessage:"Compaction failed: <msg>"}; 返回 CompactionResult{summary,firstKeptEntryId,tokensBefore,estimatedTokensAfter?,usage?,details?} | 🟡 假实现 |
@@ -48,10 +48,10 @@
 | abort_bash | 杀全部 bash controller; 部分输出+cancelled:true 仍正常返回 | 🟡 空 |
 | get_session_stats | 全量 entry 统计(含被 compact 历史): totalMessages=message 条目数(全角色); tokens=usage entries+compaction/branch_summary usage+toolResult.usage+assistant.usage 求和; cost=usage.cost.total 和; contextUsage{tokens,contextWindow,percent}? | 🟡 只算 assistant usage |
 | export_html | 单文件自包含 HTML: template.html/css/js + marked + highlight; SESSION_DATA=base64 JSON {header,entries,leafId,systemPrompt?,tools?,renderedTools?}; 文件名 `pi-session-<base>.html` | 🟡 占位 HTML |
-| switch_session | open(path)→校验(文件非法→`"Session file is not a valid pi session"`); teardown 旧(agent_settled 先发)+session_start{reason:"resume"}; {cancelled} | 🟡 未实现 |
-| fork | session_before_fork(cancel→{cancelled:true}); 校验 entryId 存在且 position="before"时 type=message+role=user 否则 `"Invalid entry ID for forking"`; targetLeaf=parentId; 新文件=root→leaf 路径(label 重挂); parentSession=旧文件; {text:用户文本,cancelled} | 🟡 未实现 |
-| clone | leafId null→`"Cannot clone session: no current entry selected"`; =fork(leafId,position:"at") | 🟡 未实现 |
-| get_fork_messages | **全部 entry**(全分支)中 type=message && role=user && 非空 → `{entryId,text}[]` | 🟡 未实现 |
+| switch_session | open(path)→校验(文件非法→`"Session file is not a valid pi session"`); teardown 旧(agent_settled 先发)+session_start{reason:"resume"}; {cancelled} | 🟡 载入对; 缺teardown事件/{cancelled} |
+| fork | session_before_fork(cancel→{cancelled:true}); 校验 entryId 存在且 position="before"时 type=message+role=user 否则 `"Invalid entry ID for forking"`; targetLeaf=parentId; 新文件=root→leaf 路径(label 重挂); parentSession=旧文件; {text:用户文本,cancelled} | 🟡 SessionFork抽取可用; 缺校验文案/事件 |
+| clone | leafId null→`"Cannot clone session: no current entry selected"`; =fork(leafId,position:"at") | 🟡 =fork(leaf,at); 文案对 |
+| get_fork_messages | **全部 entry**(全分支)中 type=message && role=user && 非空 → `{entryId,text}[]` | ✅ |
 | get_entries | 全部 entry 追加序; since→严格其后(`"Entry not found: <since>"`); {entries,leafId} | 🟡 合成 id |
 | get_tree | {entry,children,label?,labelTimestamp?}; roots: parentId null/==id/孤儿; children 按 timestamp 排; label 由 label entry 解析 | 🟡 单链无 label |
 | get_last_assistant_text | 投影里最后一个 assistant,跳过 aborted+空content; text块拼接; 空→null | 🟡 未跳过 aborted |
@@ -63,7 +63,7 @@
 
 | 字段 | pi 推导 | 状态 |
 |---|---|---|
-| model? | agent.state.model 完整 Model(无则省略键) | 🟡 恒有 |
+| model? | agent.state.model 完整 Model(无则省略键) | ✅ 目录实时值 |
 | thinkingLevel | agent.state.thinkingLevel | ✅ |
 | isStreaming | _isAgentRunActive(含 retry sleep/auto-compact/before-settle) | 🟡 恒false |
 | isCompacting | 三个 summarization controller 任一为真 | 🟡 恒false |
@@ -82,11 +82,11 @@
 | agent_start | {} | 每次 run/continue 开始(一次 prompt 可有多对) | ✅ |
 | turn_start | {} | run 开始+每次 prepareNextTurn 后 | ✅ |
 | message_start | {message} | 每条消息(含 user/system/toolResult/queued) | ✅ |
-| message_update | {usage,assistantMessageEvent} **无 message 字段**; toolcall_start 变 {id,toolName,contentIndex} | streaming | ⬜ 未流式 |
+| message_update | {usage,assistantMessageEvent} **无 message 字段**; toolcall_start 变 {id,toolName,contentIndex} | streaming | ✅ IAgentEventSink 实时 |
 | message_end | {message} | 配对 start | ✅ |
-| tool_execution_start | {toolCallId,toolName,args,parentToolCallId?} | 每次调用前 | ⬜ |
+| tool_execution_start | {toolCallId,toolName,args,parentToolCallId?} | 每次调用前 | ✅ |
 | tool_execution_update | +partialResult | 工具回调 | ⬜ |
-| tool_execution_end | +result,isError,durationMs | 完成序(并发时乱序完成) | ⬜ |
+| tool_execution_end | +result,isError,durationMs | 完成序(并发时乱序完成) | ✅ |
 | turn_end | {message,toolResults[]} | 每轮 assistant+其 tool 结果 | ✅ |
 | agent_end | {messages,willRetry} | loop 结束; willRetry 会话计算 | 🟡 缺 willRetry |
 | agent_settled | {aborted} | run 全链路终态(晚于末次 agent_end) | ⬜ |
@@ -95,7 +95,7 @@
 | compaction_end | {reason,result?,aborted,willRetry,errorMessage?} | | ⬜ |
 | entry_appended | {entry} | **仅越带追加**(context_edit/virtual-model/custom)不含普通 message | ⬜ |
 | session_info_changed | {name?} | setSessionName | ⬜ |
-| thinking_level_changed | {level} | 有效变化时 | ⬜ |
+| thinking_level_changed | {level} | 有效变化时 | ✅ |
 | auto_retry_start | {attempt,maxAttempts,delayMs,errorMessage} | | ⬜ |
 | auto_retry_end | {success,attempt,finalError?} | | ⬜ |
 | summarization_retry_* | scheduled/attempt_start/finished | | ⬜ |
@@ -149,12 +149,12 @@
 - provider 静态表 ~30 个 (env key 映射见审计D §6)
 - 流式归一化: text_*/thinking_*/toolcall_*/done/error → AssistantMessageEventStream
 - Anthropic stop 映射: end_turn→stop, max_tokens→length, tool_use→toolUse, refusal→error, pause_turn/stop_sequence→stop, sensitive→error
-- 状态: ✅ openai-responses 非流式; ⬜ 其余
+- 状态: ✅ openai-responses SSE流式+reasoning翻译; ⬜ anthropic/openai-completions
 
 ## 9. 模型目录/注册表
 
 - Model 字段全量; getAvailableSnapshot = auth 过滤; models.json `~/.pi/agent/models.json` 用户目录覆盖/合并; models-store.json 远程缓存; remote catalog `pi.dev/api/models/providers/{id}?types=chat,image,classifier` 4h 刷新 ETag; virtual-model pi-virtual; 初始选择链: scoped→saved default→preferred→first→none
-- 状态: 🟡 单 model 骨架
+- 状态: 🟡 静态目录+models.json解析+请求级model/thinkingLevel+provider mux; 缺远程目录/virtual-model/scoped
 
 ## 10. 认证
 

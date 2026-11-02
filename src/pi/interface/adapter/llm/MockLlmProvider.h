@@ -13,6 +13,9 @@ namespace pi::iface::adapter {
 // 流式: 按 pi AssistantMessageEvent 协议发合成增量 ——
 //   文本: start → text_start → text_delta×2 → text_end → done
 //   工具: start → toolcall_start → toolcall_delta → toolcall_end → done
+// thinking: req.thinkingLevel != "off" 且模型支持 reasoning 时, 在正文前
+//   发 thinking_start/delta×2/thinking_end, 最终消息携带 ThinkingBlock.
+// 模型选择: req.modelId 非空时回显为 m.model (空 = 默认 mock-1).
 // ---------------------------------------------------------------------------
 class MockLlmProvider : public domain::ILlmProvider {
 public:
@@ -35,19 +38,60 @@ public:
    void complete(domain::CompletionRequest req,
                  domain::AssistantStreamHandler onEvent,
                  domain::CompletionHandler done) override {
-      auto mk = [](std::string text) {
+      auto const modelId = req.model.id.empty() ? std::string{"mock-1"}
+                                                : req.model.id;
+      // 目录里 reasoning=false 的模型 (mock-plain) → 不发 thinking
+      auto const thinking =
+         req.thinkingLevel != "off" && req.model.reasoning;
+      auto mk = [&](std::string text) {
          domain::Message m{domain::Role::Assistant, std::move(text), {}, {}};
-         m.api = "mock"; m.provider = "mock"; m.model = "mock-1";
+         m.api = "mock"; m.provider = "mock"; m.model = modelId;
          return m;
       };
+      // UTF-8 安全切点: 字节对半会切断多字节字符 → 帧含非法 UTF-8
+      auto utf8Half = [](std::string_view s) {
+         size_t pos = s.size() / 2;
+         while (pos < s.size()
+                && (static_cast<unsigned char>(s[pos]) & 0xC0) == 0x80)
+            ++pos;
+         return pos;
+      };
+      // thinking 增量: thinking_start → delta×2 → thinking_end (contentIndex=0)
+      auto streamThinking = [&](domain::AssistantStreamEvent& e,
+                                std::string const& content) {
+         e.contentIndex = 0;
+         e.delta.clear();
+         e.type = domain::AssistantStreamType::ThinkingStart;
+         onEvent(e);
+         e.type   = domain::AssistantStreamType::ThinkingDelta;
+         auto const half = utf8Half(content);
+         e.delta = content.substr(0, half);
+         onEvent(e);
+         e.delta = content.substr(half);
+         onEvent(e);
+         e.type  = domain::AssistantStreamType::ThinkingEnd;
+         e.delta = content;
+         onEvent(e);
+         e.delta.clear();
+      };
+      auto addThinking = [&](domain::Message& m, std::string content) {
+         m.thinking.push_back(domain::ThinkingBlock{std::move(content), {}});
+      };
       // pi 流协议: 文本应答的增量序列
-      auto streamText = [&](domain::Message const& m,
+      auto streamText = [&](domain::Message m,
                             domain::StopReason reason,
                             domain::CompletionResult r) {
          domain::AssistantStreamEvent e{};
          e.type = domain::AssistantStreamType::Start;
+         e.api = m.api; e.provider = m.provider; e.model = m.model;
          onEvent(e);
-         auto const half = m.text.size() / 2;
+         int idx = 0;
+         if (!m.thinking.empty()) {
+            streamThinking(e, m.thinking.front().thinking);
+            idx = 1;
+         }
+         e.contentIndex = idx;
+         auto const half = utf8Half(m.text);
          e.type = domain::AssistantStreamType::TextStart;
          onEvent(e);
          e.type = domain::AssistantStreamType::TextDelta;
@@ -58,6 +102,7 @@ public:
          e.type = domain::AssistantStreamType::TextEnd;
          e.delta = m.text;
          onEvent(e);
+         e.contentIndex = 0;
          e.type = domain::AssistantStreamType::Done;
          e.delta.clear();
          e.reason = reason;
@@ -66,19 +111,19 @@ public:
          done(std::move(r));
       };
       // compaction 摘要请求: system prompt 是 summarization assistant → 纯文本
+      // (先构造 result 再 move m —— 同调用里 move+拷贝的实参顺序未定义)
       if (req.systemPrompt.find("context summarization assistant")
           != std::string::npos) {
          auto m = mk("## Goal\nmock summary of the conversation");
-         streamText(m, domain::StopReason::Stop,
-                    domain::CompletionResult{m,
-                                             domain::StopReason::Stop});
+         domain::CompletionResult r{m, domain::StopReason::Stop};
+         streamText(std::move(m), domain::StopReason::Stop, std::move(r));
          return;
       }
       if (!req.messages.empty() && req.messages.back().role == domain::Role::Tool) {
          auto m = mk("工具返回: " + req.messages.back().text);
-         streamText(m, domain::StopReason::Stop,
-                    domain::CompletionResult{m,
-                                             domain::StopReason::Stop});
+         if (thinking) addThinking(m, "工具结果已收到, 总结给用户.");
+         domain::CompletionResult r{m, domain::StopReason::Stop};
+         streamText(std::move(m), domain::StopReason::Stop, std::move(r));
          return;
       }
       auto const& input = req.messages.empty() ? std::string{} : req.messages.back().text;
@@ -90,9 +135,8 @@ public:
          auto m = mk("usage reply");
          m.usage.totalTokens = n;
          m.usage.input = n;
-         streamText(m, domain::StopReason::Stop,
-                    domain::CompletionResult{m,
-                                             domain::StopReason::Stop});
+         domain::CompletionResult r{m, domain::StopReason::Stop};
+         streamText(std::move(m), domain::StopReason::Stop, std::move(r));
          return;
       }
       // 前缀路由不同工具路径:
@@ -112,12 +156,21 @@ public:
          }
       }
       auto msg = mk("我需要先调用 " + tool + " 工具");
+      if (thinking)
+         addThinking(msg, "用户在问 \"" + input + "\", 先调工具拿到结果再回答.");
       domain::ToolCall call{"call-1", tool, arg};
       msg.toolCalls.push_back(call);
-      // 增量序列 (pi 内容块交错): text@0 → toolcall@1 → done(toolUse)
+      // 增量序列 (pi 内容块交错): thinking@0 → text@1 → toolcall@2 → done
       domain::AssistantStreamEvent e{};
       e.type = domain::AssistantStreamType::Start;
+      e.api = msg.api; e.provider = msg.provider; e.model = msg.model;
       onEvent(e);
+      int idx = 0;
+      if (!msg.thinking.empty()) {
+         streamThinking(e, msg.thinking.front().thinking);
+         idx = 1;
+      }
+      e.contentIndex = idx;
       e.type = domain::AssistantStreamType::TextStart;
       onEvent(e);
       e.type  = domain::AssistantStreamType::TextDelta;
@@ -126,7 +179,7 @@ public:
       e.type = domain::AssistantStreamType::TextEnd;
       onEvent(e);
       e.delta.clear();
-      e.contentIndex = 1;
+      e.contentIndex = idx + 1;
       e.type = domain::AssistantStreamType::ToolCallStart;
       e.toolCallId = call.id;
       e.toolName   = call.tool;
@@ -140,6 +193,7 @@ public:
       e.toolCall = call;
       onEvent(e);
       e.type = domain::AssistantStreamType::Done;
+      e.contentIndex = 0;
       e.toolCall = {};
       e.reason = domain::StopReason::ToolUse;
       e.usage  = msg.usage;

@@ -27,8 +27,10 @@ public:
       , AgentTurnContext(session, std::move(systemPrompt)) {}
 
    IMPL_ROLE(EventQueueCtx)
+   IMPL_ROLE(EventSinkCtx)
    IMPL_ROLE(TurnStateCtx)
    IMPL_ROLE(SessionCtx)
+   IMPL_ROLE(ModelCtx)
 };
 
 } // namespace pi::domain

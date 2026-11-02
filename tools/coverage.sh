@@ -35,7 +35,7 @@ xcrun llvm-profdata merge -sparse cov-prof/*.profraw -o cov-prof/merged.profdata
 
 xcrun llvm-cov report "./$BUILD/cpp-pi" \
    -instr-profile=cov-prof/merged.profdata \
-   --ignore-filename-regex='(third_party|trans-dsl|/usr/|\.hpp$|OpenAiProvider|HttpClient|CodexConfig)' \
+   --ignore-filename-regex='(third_party|trans-dsl|/usr/|\.hpp$|OpenAiProvider|HttpClient|CodexConfig|interface/tui/)' \
    | tee cov-prof/report.txt
 
 echo

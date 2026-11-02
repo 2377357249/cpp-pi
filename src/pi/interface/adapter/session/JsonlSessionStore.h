@@ -163,6 +163,67 @@ public:
       return f ? outPath.string() : std::string{};
    }
 
+   // ---------- /resume: 列 cwd 目录下的历史会话 (mtime 新→旧) ----------
+   auto list(std::string_view cwd) const
+      -> std::vector<domain::SessionListItem> override {
+      std::vector<domain::SessionListItem> out;
+      auto const dir = sessionsDir(cwd);
+      std::error_code ec;
+      if (!fs::exists(dir, ec)) return out;
+      for (auto const& de : fs::directory_iterator(dir, ec)) {
+         if (!de.is_regular_file() || de.path().extension() != ".jsonl")
+            continue;
+         auto item = scan(de.path());
+         if (!item.sessionId.empty()) out.push_back(std::move(item));
+      }
+      std::ranges::sort(out, {}, [](auto const& i) { return -i.mtimeMs; });
+      return out;
+   }
+
+   // 快速扫一个会话文件: header id/timestamp + 首条 user + 最新名字.
+   static auto scan(fs::path const& path) -> domain::SessionListItem {
+      domain::SessionListItem item;
+      item.path = path.string();
+      std::error_code ec;
+      item.mtimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+         fs::last_write_time(path, ec).time_since_epoch()).count();
+      std::ifstream f{path};
+      for (std::string line; std::getline(f, line);) {
+         if (line.empty()) continue;
+         auto pj = infra::parseJsonSafe(line);
+         if (pj.hasError() || !pj->isObject() || !pj->count("type"))
+            continue;
+         auto const& j = *pj;
+         auto const    t = j["type"].getString();
+         if (t == "session") {
+            if (j.count("id"))        item.sessionId = j["id"].getString();
+            if (j.count("timestamp")) item.timestamp =
+               j["timestamp"].getString();
+         } else if (t == "session_info" && j.count("name")) {
+            item.name = j["name"].getString();
+         } else if (t == "message" && item.firstUserText.empty()
+                    && j.count("message")) {
+            auto const& m = j["message"];
+            if (m.count("role") && m["role"].getString() == "user") {
+               if (m.count("content") && m["content"].isString())
+                  item.firstUserText = m["content"].getString();
+               else if (m.count("content") && m["content"].isArray())
+                  for (auto const& c : m["content"].items())
+                     if (c.second.count("type")
+                         && c.second["type"].getString() == "text"
+                         && c.second.count("text")) {
+                        item.firstUserText = c.second["text"].getString();
+                        break;
+                     }
+            }
+         }
+         if (!item.sessionId.empty() && !item.firstUserText.empty()
+             && !item.name.empty())
+            break;   // 元数据齐了提前收工
+      }
+      return item;
+   }
+
 private:
    fs::path                                agentDir_;
    std::unordered_map<std::string, fs::path> fileOf_;

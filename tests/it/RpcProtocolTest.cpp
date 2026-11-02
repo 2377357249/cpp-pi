@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <gtest/gtest.h>
+#include <ranges>
 
 #include "RpcHarness.h"
 
@@ -40,10 +41,12 @@ TEST(RpcPromptSemantics, EmitsStartedResponseAndAgentEvents) {
    EXPECT_TRUE(resps[0]["success"].getBool());
    EXPECT_EQ(resps[0]["data"]["disposition"].getString(), "started");
 
-   // 事件流: agent_start -> turn_start -> message_start/end x4
-   //        -> turn_end -> agent_end
+   // pi runLoop: turn = 一个 assistant round —— mock 应答为 2 轮
+   // (toolCall 轮 + 文本轮): agent_start → turn_start → msg(user) →
+   // [asst/toolResult 一轮] → turn_end → turn_start → [asst 文本轮]
+   // → turn_end → agent_end
    EXPECT_EQ(RpcHarness::ofType(frames, "agent_start").size(), 1u);
-   EXPECT_EQ(RpcHarness::ofType(frames, "turn_start").size(), 1u);
+   EXPECT_EQ(RpcHarness::ofType(frames, "turn_start").size(), 2u);
    auto msgEnds = RpcHarness::ofType(frames, "message_end");
    ASSERT_EQ(msgEnds.size(), 4u);
    EXPECT_EQ(msgEnds[0]["message"]["role"].getString(), "user");
@@ -51,8 +54,9 @@ TEST(RpcPromptSemantics, EmitsStartedResponseAndAgentEvents) {
    EXPECT_EQ(msgEnds[3]["message"]["stopReason"].getString(), "stop");
 
    auto turnEnds = RpcHarness::ofType(frames, "turn_end");
-   ASSERT_EQ(turnEnds.size(), 1u);
+   ASSERT_EQ(turnEnds.size(), 2u);
    EXPECT_EQ(turnEnds[0]["toolResults"].size(), 1u);
+   EXPECT_EQ(turnEnds[1]["toolResults"].size(), 0u);
    auto agentEnds = RpcHarness::ofType(frames, "agent_end");
    ASSERT_EQ(agentEnds.size(), 1u);
    EXPECT_EQ(agentEnds[0]["messages"].size(), 4u);
@@ -354,18 +358,22 @@ TEST(RpcMode, StreamingMessageUpdateFrames) {
    ASSERT_LT(aStart, frames.size());
    // 骨架: 流开始的 assistant content 为空
    EXPECT_TRUE(frames[aStart]["message"]["content"].empty());
-   // mock 路由 text@0 → toolcall@1: 6 个 update 帧后接 message_end
-   auto seg = typesOf(aStart + 1, aStart + 8);
-   ASSERT_EQ(seg.size(), 7u);
-   EXPECT_EQ(seg[0], "mu:text_start");
-   EXPECT_EQ(seg[1], "mu:text_delta");
-   EXPECT_EQ(seg[2], "mu:text_end");
-   EXPECT_EQ(seg[3], "mu:toolcall_start");
-   EXPECT_EQ(seg[4], "mu:toolcall_delta");
-   EXPECT_EQ(seg[5], "mu:toolcall_end");
-   EXPECT_EQ(seg[6], "message_end");
+   // mock 路由 thinking@0 → text@1 → toolcall@2: 10 个 update 帧后接 message_end
+   auto seg = typesOf(aStart + 1, aStart + 12);
+   ASSERT_EQ(seg.size(), 11u);
+   EXPECT_EQ(seg[0], "mu:thinking_start");
+   EXPECT_EQ(seg[1], "mu:thinking_delta");
+   EXPECT_EQ(seg[2], "mu:thinking_delta");
+   EXPECT_EQ(seg[3], "mu:thinking_end");
+   EXPECT_EQ(seg[4], "mu:text_start");
+   EXPECT_EQ(seg[5], "mu:text_delta");
+   EXPECT_EQ(seg[6], "mu:text_end");
+   EXPECT_EQ(seg[7], "mu:toolcall_start");
+   EXPECT_EQ(seg[8], "mu:toolcall_delta");
+   EXPECT_EQ(seg[9], "mu:toolcall_end");
+   EXPECT_EQ(seg[10], "message_end");
    // toolcall_start 展开 {id,toolName}, 无 partial
-   auto tcStart = frames[aStart + 4]["assistantMessageEvent"];
+   auto tcStart = frames[aStart + 8]["assistantMessageEvent"];
    EXPECT_EQ(tcStart["id"].getString(), "call-1");
    EXPECT_EQ(tcStart["toolName"].getString(), "echo");
    EXPECT_FALSE(tcStart.count("partial"));
@@ -399,11 +407,118 @@ TEST(RpcMode, StreamingMessageUpdateFrames) {
       upd.push_back(
          frames[i]["assistantMessageEvent"]["type"].getString());
    }
-   ASSERT_GE(upd.size(), 4u);
-   EXPECT_EQ(upd.front(), "text_start");
+   ASSERT_GE(upd.size(), 8u);
+   EXPECT_EQ(upd.front(), "thinking_start");
    EXPECT_EQ(upd.back(), "text_end");
    // done/error 不以 message_update 出现
    EXPECT_EQ(std::ranges::count(upd, "done"), 0);
+}
+
+// == 模型目录: get_available_models / set_model 校验 / cycle_model ==========
+TEST(RpcMode, AvailableModelsAndSetModel) {
+   auto p = RpcProc::spawn();
+
+   p.send(R"({"type":"get_available_models"})");
+   auto r1 = p.readResponse("get_available_models");
+   ASSERT_TRUE(r1["success"].getBool());
+   // 静态 mock 目录: mock-1/mock-2 (reasoning) + mock-plain (无 reasoning)
+   std::vector<std::string> ids;
+   for (auto const& m : r1["data"]["models"])
+      ids.push_back(m["provider"].getString() + "/"
+                    + m["id"].getString());
+   EXPECT_TRUE(std::ranges::find(ids, "mock/mock-1") != ids.end());
+   EXPECT_TRUE(std::ranges::find(ids, "mock/mock-plain") != ids.end());
+
+   // 未知模型 -> error 帧
+   p.send(R"({"type":"set_model","provider":"mock","modelId":"nope"})");
+   auto bad = p.readResponse("set_model");
+   EXPECT_FALSE(bad["success"].getBool());
+   EXPECT_TRUE(bad["error"].getString().find("nope")
+               != std::string::npos);
+
+   // 合法切换 -> data=当前模型, get_state 同步反映
+   p.send(R"({"type":"set_model","provider":"mock","modelId":"mock-plain"})");
+   auto ok = p.readResponse("set_model");
+   ASSERT_TRUE(ok["success"].getBool());
+   EXPECT_EQ(ok["data"]["id"].getString(), "mock-plain");
+   p.send(R"({"type":"get_state"})");
+   auto st = p.readResponse("get_state");
+   EXPECT_EQ(st["data"]["model"]["id"].getString(), "mock-plain");
+   EXPECT_FALSE(st["data"]["model"]["reasoning"].getBool());
+}
+
+TEST(RpcMode, CycleModelAdvancesWithinProvider) {
+   auto p = RpcProc::spawn();
+   // pi ModelCycleResult 形状: {model, thinkingLevel, isScoped};
+   // mock 目录 mock-1 → mock-2 → mock-plain → 回绕 mock-1
+   std::vector<std::string> seen;
+   for (int i = 0; i < 3; ++i) {
+      p.send(R"({"type":"cycle_model"})");
+      auto r = p.readResponse("cycle_model");
+      ASSERT_TRUE(r["success"].getBool());
+      ASSERT_TRUE(r["data"]["model"].isObject());
+      EXPECT_FALSE(r["data"]["isScoped"].getBool());
+      seen.push_back(r["data"]["model"]["id"].getString());
+   }
+   EXPECT_EQ(seen[0], "mock-2");
+   EXPECT_EQ(seen[1], "mock-plain");
+   EXPECT_EQ(seen[2], "mock-1");
+}
+
+// == thinking 级别: set_thinking_level 发事件 + cycle_thinking_level ======
+TEST(RpcMode, ThinkingLevelCommands) {
+   auto p = RpcProc::spawn();
+   p.send(R"({"type":"get_available_thinking_levels"})");
+   auto lv = p.readResponse("get_available_thinking_levels");
+   ASSERT_TRUE(lv["success"].getBool());
+   EXPECT_GT(lv["data"]["levels"].size(), 1u);
+
+   p.send(R"({"type":"set_thinking_level","level":"high"})");
+   // 事件帧先于 response 上线 (emit 在 ok_ 之前)
+   auto ev = p.readUntil("thinking_level_changed");
+   ASSERT_TRUE(ev.isObject());
+   EXPECT_EQ(ev["level"].getString(), "high");
+   auto r = p.readResponse("set_thinking_level");
+   ASSERT_TRUE(r["success"].getBool());
+   p.send(R"({"type":"get_state"})");
+   auto st = p.readResponse("get_state");
+   EXPECT_EQ(st["data"]["thinkingLevel"].getString(), "high");
+
+   // cycle 推进一步 (high -> xhigh)
+   p.send(R"({"type":"cycle_thinking_level"})");
+   auto c = p.readResponse("cycle_thinking_level");
+   ASSERT_TRUE(c["success"].getBool());
+   EXPECT_EQ(c["data"]["level"].getString(), "xhigh");
+}
+
+// == thinking 帧体: mock 在 reasoning 模型下发 thinking_* 增量 ===========
+TEST(RpcMode, ThinkingDeltasFlowToWire) {
+   auto p = RpcProc::spawn();
+   p.send(R"({"type":"prompt","message":"hi"})");
+   bool sawStart = false, sawDelta = false, sawEnd = false;
+   std::string acc;
+   for (;;) {
+      auto f = p.readFrame();
+      if (!f.isObject()) break;
+      auto const t = f["type"].getString();
+      if (t == "agent_end") break;
+      if (t != "message_update") continue;
+      auto const& e = f["assistantMessageEvent"];
+      auto const et = e["type"].getString();
+      if (et == "thinking_start") sawStart = true;
+      if (et == "thinking_delta" && e.count("delta")) {
+         sawDelta = true;
+         acc += e["delta"].getString();
+      }
+      if (et == "thinking_end") {
+         sawEnd = true;
+         // pi 线协议: *_end 帧携带 content = 累计全文
+         ASSERT_TRUE(e.count("content"));
+         EXPECT_EQ(e["content"].getString(), acc);
+         acc.clear();                              // 下一回合重新累计
+      }
+   }
+   EXPECT_TRUE(sawStart && sawDelta && sawEnd);
 }
 
 // == abort: 事务在下一个周期检查点退出 =======================================

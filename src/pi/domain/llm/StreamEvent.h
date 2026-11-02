@@ -32,6 +32,9 @@ struct AssistantStreamEvent {
    domain::ToolCall toolCall;// toolcall_end.toolCall
    StopReason  reason = StopReason::Pending;  // done/error
    Usage       usage;        // event 时刻 partial.message.usage 快照
+   // start 事件携带的 partial 身份 (pi AssistantMessage.api/provider/model),
+   // 骨架消息从这三个字段构造
+   std::string api, provider, model;
 };
 
 using AssistantStreamHandler =

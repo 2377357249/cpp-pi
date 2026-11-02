@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <string>
 #include <vector>
@@ -27,6 +28,19 @@ struct ToolResult {
 };
 
 using ToolResultHandler = std::function<void(ToolResult)>;
+
+// ToolResult -> toolResult 消息的唯一构造点 (pi createToolResultMessage):
+// 发射帧与持久化必须共用同一条消息, 时间戳在建消息时钉死.
+inline auto toolResultMessage(ToolResult const& r) -> Message {
+   Message m{Role::Tool, r.content, {}, r.toolCallId, r.toolName, r.isError};
+   m.images      = r.images;
+   m.detailsJson = r.detailsJson;
+   m.durationMs  = r.durationMs;
+   m.timestampMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      std::chrono::system_clock::now().time_since_epoch())
+                      .count();
+   return m;
+}
 
 // ---------------------------------------------------------------------------
 // 端口: 工具执行器

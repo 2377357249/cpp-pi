@@ -17,20 +17,23 @@ namespace pi::infra::log {
 
 // ---------------------------------------------------------------------------
 // quill 初始化: 后台线程异步日志.
-//   - console sink 走 stderr (不污染 RPC 模式的 stdout 协议通道)
+//   - console sink 走 stderr (不污染 RPC 模式的 stdout 协议通道);
+//     TUI 模式传 console=false —— stderr 与全屏界面共享同一 tty 会刷屏
 //   - rotating file sink: 每分钟滚动 + 保留 30 个备份 ≈ 保留最近 30 分钟日志
 // ---------------------------------------------------------------------------
-inline quill::Logger* init(std::string const& logDir = "logs") {
+inline quill::Logger* init(std::string const& logDir = "logs",
+                           bool              console = true) {
    quill::Backend::start();
 
    std::filesystem::create_directories(logDir);
 
-   quill::ConsoleSinkConfig consoleCfg;
-   consoleCfg.set_stream("stderr");
-
    std::vector<std::shared_ptr<quill::Sink>> sinks;
-   sinks.push_back(quill::Frontend::create_or_get_sink<quill::ConsoleSink>(
-      "console", consoleCfg));
+   if (console) {
+      quill::ConsoleSinkConfig consoleCfg;
+      consoleCfg.set_stream("stderr");
+      sinks.push_back(quill::Frontend::create_or_get_sink<quill::ConsoleSink>(
+         "console", consoleCfg));
+   }
 
    quill::RotatingFileSinkConfig cfg;
    cfg.set_open_mode('a');

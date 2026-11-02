@@ -11,29 +11,28 @@
 #include <pi/domain/session/Session.h>
 #include <pi/infra/config/CodexConfig.h>
 #include <pi/infra/util/Ids.h>
+#include <pi/interface/adapter/llm/LlmProviderMux.h>
 #include <pi/interface/adapter/llm/MockLlmProvider.h>
 #include <pi/interface/adapter/llm/OpenAiProvider.h>
+#include <pi/interface/adapter/model/ModelCatalogLoader.h>
 #include <pi/interface/adapter/session/InMemorySessionStore.h>
 #include <pi/interface/adapter/session/JsonlSessionStore.h>
 #include <pi/interface/adapter/tools/LocalToolExecutor.h>
 #include <pi/infra/log/Logging.h>
 #include <pi/interface/rpc/RpcFrontend.h>
+#include <pi/interface/tui/TuiFrontend.h>
 
 // ---------------------------------------------------------------------------
-// 入口: 默认 CLI REPL; `--mode rpc` 起 NDJSON 协议端, 供 pi TUI 接入.
+// 入口: 默认 CLI REPL; `--mode rpc` 起 NDJSON 协议端, 供 pi TUI 接入;
+//   `--mode tui` 起 FTXUI 全屏界面 (纯 C++ 前端, 无需 TS 端).
 //   --provider openai|mock   默认: 有 codex/openai 凭证则 openai, 否则 mock
 //   --no-session             不持久化会话 (InMemorySessionStore)
 //   --session-dir <path>     覆盖 ~/.pi/agent 存储根目录
 // ---------------------------------------------------------------------------
-namespace {
-
-constexpr int64_t kDefaultContextWindow = 200000;
-constexpr int64_t kDefaultMaxTokens     = 8192;
-
-} // namespace
 
 int main(int argc, char** argv) {
    bool        rpcMode   = false;
+   bool        tuiMode   = false;
    bool        noSession = false;
    bool        noTools   = false;
    std::string provider  = "auto";
@@ -57,9 +56,9 @@ int main(int argc, char** argv) {
       return out;
    };
    for (int i = 1; i < argc; ++i) {
-      if (std::strcmp(argv[i], "--mode") == 0 && i + 1 < argc &&
-          std::strcmp(argv[i + 1], "rpc") == 0) {
-         rpcMode = true;
+      if (std::strcmp(argv[i], "--mode") == 0 && i + 1 < argc) {
+         rpcMode = std::strcmp(argv[i + 1], "rpc") == 0;
+         tuiMode = std::strcmp(argv[i + 1], "tui") == 0;
       } else if (std::strcmp(argv[i], "--provider") == 0 && i + 1 < argc) {
          provider = argv[++i];
       } else if (std::strcmp(argv[i], "--no-session") == 0) {
@@ -78,30 +77,50 @@ int main(int argc, char** argv) {
       }
    }
 
-   pi::infra::log::init();
+   // TUI 独占终端: 日志只留文件 sink (stderr 会打花全屏界面)
+   pi::infra::log::init("logs", /*console=*/!tuiMode);
 
+   // ---------- provider mux + 模型目录 ----------
+   // mux 是 service 持有的稳定 ILlmProvider 门面; setModel 跨 provider 时
+   // 经 providerChange 钩子切转发目标. provider 工厂按 ProviderSpec.api:
+   //   "mock"→MockLlmProvider, "openai-responses"→OpenAiProvider;
+   //   其他 api 无实现 → use() false → set_model 报 "No provider available".
    auto codex = pi::infra::CodexConfig::load();
-   std::unique_ptr<pi::domain::ILlmProvider> llm;
-   if (provider != "mock" && codex) {
-      llm = std::make_unique<pi::iface::adapter::OpenAiProvider>(
-         codex->apiKey, codex->baseUrl, codex->model);
-      LOG_INFO(pi::infra::log::logger(), "provider: openai model={} base={}",
-               codex->model, codex->baseUrl);
-   } else {
-      llm = std::make_unique<pi::iface::adapter::MockLlmProvider>();
-      LOG_INFO(pi::infra::log::logger(), "provider: mock");
-   }
+   auto const agentDir = sessionDir.empty()
+      ? std::filesystem::path{std::getenv("HOME")} / ".pi" / "agent"
+      : std::filesystem::path{sessionDir};
+   // --provider mock = 显式离线: 目录只含 mock 条目, codex provider 不进 mux
+   // (测试密封: mock 模式下任何路径都不许摸到真网络).
+   auto bundle = pi::iface::adapter::ModelCatalogLoader::load(
+      agentDir, provider == "mock" ? std::nullopt : codex);
 
-   // 会话存储: 默认 JSONL 落 ~/.pi/agent (--session-dir 可覆盖); --no-session
+   pi::iface::adapter::LlmProviderMux mux;
+   for (auto const& [pid, spec] : bundle.providers) {
+      if (provider == "mock" && pid != "mock") continue;   // 离线密封
+      if (pid == "mock") {
+         mux.add(pid, std::make_unique<pi::iface::adapter::MockLlmProvider>());
+      } else if (spec.api == "openai-responses" && !spec.apiKey.empty()) {
+         mux.add(pid, std::make_unique<pi::iface::adapter::OpenAiProvider>(
+                         spec.apiKey, spec.baseUrl, /*model*/ "", pid));
+      }
+   }
+   if (provider == "mock" || !mux.has("openai-codex")) {
+      mux.use("mock");
+      LOG_INFO(pi::infra::log::logger(), "provider: mock");
+   } else {
+      mux.use("openai-codex");
+      LOG_INFO(pi::infra::log::logger(), "provider: openai-codex base={}",
+               codex->baseUrl);
+   }
+   auto& llm = mux;
+
+   // 会话存储: 默认 JSONL 落 agentDir (--session-dir 可覆盖); --no-session
    // 走纯内存 (测试/一次性会话).
    std::unique_ptr<pi::domain::ISessionStore> store;
    if (noSession) {
       store = std::make_unique<pi::iface::adapter::InMemorySessionStore>();
    } else {
-      auto dir = sessionDir.empty()
-         ? std::filesystem::path{std::getenv("HOME")} / ".pi" / "agent"
-         : std::filesystem::path{sessionDir};
-      store = std::make_unique<pi::iface::adapter::JsonlSessionStore>(dir);
+      store = std::make_unique<pi::iface::adapter::JsonlSessionStore>(agentDir);
    }
 
    char cwdBuf[4096];
@@ -120,38 +139,38 @@ int main(int argc, char** argv) {
       std::erase(active, x);
    if (!noTools) tools.setActiveTools(active);
    pi::iface::AgentSessionService  service{
-      session, *llm, tools, *store,
+      session, llm, tools, *store,
       "You are cpp-pi, a DDD + DCI + trans-dsl rewrite of pi."};
 
-   if (rpcMode) {
-      pi::iface::rpc::RpcFrontend frontend{service, session, store.get()};
-      if (codex && provider != "mock") {
-         frontend.setModel(pi::domain::Model{
-            /*id*/ codex->model, /*name*/ codex->model,
-            /*api*/ "openai-responses", /*provider*/ "openai-codex",
-            /*baseUrl*/ codex->baseUrl, /*input*/ {"text"},
-            /*cost*/ {}, /*contextWindow*/ kDefaultContextWindow,
-            /*maxTokens*/ kDefaultMaxTokens, /*reasoning*/ true});
-      }
-      // pi resolveSpawnContext: bash 子进程注入 PI_* 会话环境
-      tools.setEnvProvider([&] {
-         auto const& m = frontend.model();
-         return pi::iface::adapter::ToolSessionEnv{
-            session.id(), frontend.sessionFile(),
-            m.provider, m.id, frontend.thinkingLevel()};
-      });
+   // 目录 + provider 切换钩子 + 初始模型 (catalog 必含; mock 场景退 mock-1)
+   service.setCatalog(std::move(bundle.catalog));
+   service.setProviderChangeHandler(
+      [&mux](std::string_view pid) { return mux.use(pid); });
+   auto const defaultProvider =
+      (provider != "mock" && mux.has("openai-codex"))
+         ? std::string{"openai-codex"} : std::string{"mock"};
+   auto const defaultModel =
+      defaultProvider == "openai-codex" ? codex->model : std::string{"mock-1"};
+   if (auto err = service.setModel(defaultProvider, defaultModel))
+      LOG_WARNING(pi::infra::log::logger(), "set_model: {}", *err);
+
+   // pi resolveSpawnContext: bash 子进程注入 PI_* 会话环境 (跟随当前模型)
+   tools.setEnvProvider([&] {
+      auto const& m = service.model();
+      return pi::iface::adapter::ToolSessionEnv{
+         session.id(), store->fileOf(session),
+         m.provider, m.id, service.thinkingLevel()};
+   });
+
+   if (tuiMode) {
+      pi::iface::tui::TuiFrontend frontend{service, session, *store};
       return frontend.run();
    }
 
-   tools.setEnvProvider([&] {
-      return pi::iface::adapter::ToolSessionEnv{
-         session.id(),
-         store->fileOf(session),
-         codex && provider != "mock" ? std::string{"openai-codex"}
-                                     : std::string{"mock"},
-         codex && provider != "mock" ? codex->model : std::string{"mock-1"},
-         "medium"};
-   });
+   if (rpcMode) {
+      pi::iface::rpc::RpcFrontend frontend{service, session, store.get()};
+      return frontend.run();
+   }
 
    std::puts("cpp-pi skeleton (DDD + DCI + trans-dsl). /q to quit.");
    for (std::string line;;) {
